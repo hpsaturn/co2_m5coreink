@@ -1,26 +1,39 @@
 #include "M5CoreInk.h"
+// GxEPD2_MinimumExample.ino by Jean-Marc Zingg
 
-Ink_Sprite InkPageSprite(&M5.M5Ink);
+// purpose is e.g. to determine minimum code and ram use by this library
 
-void setup() {
+// see GxEPD2_wiring_examples.h of GxEPD2_Example for wiring suggestions and examples
+// if you use a different wiring, you need to adapt the constructor parameters!
 
-    M5.begin();
-    if( !M5.M5Ink.isInit())
-    {
-        Serial.printf("Ink Init faild");
-        while (1) delay(100);   
-    }
-    M5.M5Ink.clear();
-    delay(1000);
-    //creat ink refresh Sprite
-    if( InkPageSprite.creatSprite(0,0,200,200,true) != 0 )
-    {
-        Serial.printf("Ink Sprite creat faild");
-    }
-    InkPageSprite.drawString(35,50,"Hello World!");
-    InkPageSprite.pushSprite();
+// uncomment next line to use class GFX of library GFX_Root instead of Adafruit_GFX, to use less code and ram
+//#include <GFX.h>
+
+#include <GxEPD2_BW.h> // including both doesn't use more code or ram
+#include <GxEPD2_3C.h> // including both doesn't use more code or ram
+
+// select the display class and display driver class in the following file (new style):
+// #include "GxEPD2_display_selection_new_style.h"
+
+// alternately you can copy the constructor from GxEPD2_display_selection.h or GxEPD2_display_selection_added.h of GxEPD2_Example to here
+// e.g. for Wemos D1 mini:
+//GxEPD2_BW<GxEPD2_154_D67, GxEPD2_154_D67::HEIGHT> display(GxEPD2_154_D67(/*CS=D8*/ SS, /*DC=D3*/ 0, /*RST=D4*/ 2, /*BUSY=D2*/ 4)); // GDEH0154D67
+GxEPD2_BW<GxEPD2_154_M09, GxEPD2_154_M09::HEIGHT> display(GxEPD2_154_M09(/*CS=D8*/ 9, /*DC=D3*/ 15, /*RST=D4*/ 0, /*BUSY=D2*/ 4)); // GDEH0154D67
+
+void setup()
+{
+  display.init();
+  // comment out next line to have no or minimal Adafruit_GFX code
+  display.setTextColor(GxEPD_BLACK);
+  display.firstPage();
+  do
+  {
+    display.fillScreen(GxEPD_WHITE);
+    // comment out next line to have no or minimal Adafruit_GFX code
+    display.print("Hello World!");
+  }
+  while (display.nextPage());
 }
 
-void loop() {
+void loop() {};
 
-}
