@@ -19,6 +19,7 @@
 #include <Fonts/FreeMonoBold9pt7b.h>
 #include <Fonts/FreeMonoBold18pt7b.h>
 #include <Fonts/FreeMonoBold12pt7b.h>
+#include <Fonts/FreeMonoBold24pt7b.h>
 
 #include "bitmaps/Bitmaps200x200.h"  // 1.54" b/w
 
@@ -26,23 +27,23 @@ GxEPD2_154_M09 medp = GxEPD2_154_M09(/*CS=D8*/ 9, /*DC=D3*/ 15, /*RST=D4*/ 0, /*
 GxEPD2_BW<GxEPD2_154_M09, GxEPD2_154_M09::HEIGHT> display(medp);  // GDEH0154D67
 
 SCD30 airSensor;
-uint16_t co2value;
+uint16_t co2value = 0;
 float co2temp, co2humi;
 uint16_t count;
 
 void helloWorldCallback(const void*) {
-    uint16_t x = 10;
-    uint16_t y = display.height() / 2 - 60;
+    uint16_t x = 15;
+    uint16_t y = display.height() / 2 - 30;
     display.fillScreen(GxEPD_WHITE);
     display.setCursor(x, y);
-    display.println("CO2 Sensor");
+    display.print("0000");
 }
 
 void helloWorld() {
     //Serial.println("helloWorld");
     display.setRotation(0);
-    display.setFont(&FreeMonoBold12pt7b);
-    display.setTextSize(1);
+    display.setFont(&FreeMonoBold18pt7b);
+    display.setTextSize(2);
     display.setTextColor(GxEPD_BLACK);
     display.setFullWindow();
     display.drawPaged(helloWorldCallback, 0);
@@ -50,42 +51,52 @@ void helloWorld() {
 }
 
 void helloFullScreenPartialModeCallback(const void*) {
-    uint16_t x = 10;
-    uint16_t y = display.height() / 2 - 60;
+    uint16_t x = 15;
+    uint16_t y = display.height() / 2 - 30;
     display.fillScreen(GxEPD_WHITE);
+    display.setTextSize(2);
     display.setCursor(x, y);
-    display.println("CO2 Sensor");
+    display.setFont(&FreeMonoBold18pt7b);
+    display.print(String(co2value).c_str());
+
+    display.setFont(&FreeMonoBold9pt7b);
+    x = display.width() / 2 - 14;
+    y = display.height() / 2 - 8;
     display.setTextSize(0);
-    y = display.height() / 2;
     display.setCursor(x, y);
-    StreamString valueString;
-    valueString.print(co2value, 0);
-    display.println(String(co2value).c_str());
-    display.println(String(co2temp).c_str());
-    display.println(String(co2humi).c_str());
-    // y = display.height() * 3 /4;
-    // if (display.width() <= 200) x = 10;
-    // display.setCursor(x, y);
-    // if (display.epd2.hasFastPartialUpdate) {
-    //     display.println("fast partial mode");
-    // } else if (display.epd2.hasPartialUpdate) {
-    //     display.println("slow partial mode");
-    // } else {
-    //     display.println("no partial mode");
-    // }
+    display.print("PPM");
+
+    display.setFont(&FreeMonoBold12pt7b);
+    display.setTextSize(1);
+
+    x = 11;
+    y = display.height() / 2 + 40;
+    display.setCursor(x, y);
+    display.printf("Temp: %.2fC",co2temp);
+
+    y = display.height() / 2 + 60;
+    display.setCursor(x, y);
+    display.printf("Humi: %.2f%%",co2humi);
+
+    // delay(1000);
+    // display.hibernate();
+    // display.powerOff();
+    // M5.shutdown(10);
+    delay(2000);
 }
 
 void helloFullScreenPartialMode() {
     //Serial.println("helloFullScreenPartialMode");
     display.setPartialWindow(0, 0, display.width(), display.height());
     display.setRotation(0);
-    display.setTextSize(0);
+    display.setFont(&FreeMonoBold24pt7b);
+    display.setTextSize(1);
     display.setTextColor(GxEPD_BLACK);
     display.drawPaged(helloFullScreenPartialModeCallback, 0);
     //Serial.println("helloFullScreenPartialMode done");
 }
 
-void sensorsLoop() {
+bool sensorsLoop() {
     if (airSensor.dataAvailable()) {
 
         co2value = airSensor.getCO2();
@@ -100,8 +111,9 @@ void sensorsLoop() {
         Serial.print(airSensor.getHumidity(), 1);
         Serial.println();
 
-    } else
-        Serial.print(".");
+        return true;
+    } 
+    return false;
 }
 
 
@@ -112,9 +124,8 @@ void runDemo() {
     // partial refresh mode can be used to full screen,
     // effective if display panel hasFastPartialUpdate
     helloFullScreenPartialMode();
-    // delay(1000);
-    // helloArduino();
     delay(1000);
+    // helloArduino();
 }
 
 void setup() {
@@ -122,27 +133,28 @@ void setup() {
     Serial.println();
     delay(10);
     Serial.println("setup");
-    M5.begin(false, false, true);
-    delay(100);
-    M5.update();
-    // if (M5.BtnMID.isPressed()) {
-    display.init(115200,false);
-
-    runDemo();
-
     Wire.begin(25, 26);
-
     if (airSensor.begin(Wire) == false) {
         Serial.println("Air sensor not detected. Please check wiring. Freezing...");
         while (1);
     }
-
+    M5.begin(false, false, true);
+    delay(100);
+    M5.update();
+    display.init(115200,true);
+    display.setRotation(0);
+    display.setFont(&FreeMonoBold12pt7b);
+    display.setTextSize(1);
+    display.setTextColor(GxEPD_BLACK);
+    if (M5.BtnMID.isPressed()) {
+        helloWorld();
+        delay(1000);
+    }
+    helloWorld();
     Serial.println("setup done");
     delay(2000);
 }
 
 void loop() {
-    sensorsLoop();
-    helloFullScreenPartialMode();
-    delay(1000);
+    while(!sensorsLoop())helloFullScreenPartialMode();
 }
