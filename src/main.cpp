@@ -1,4 +1,7 @@
-#include "M5CoreInk.h"
+#include <Arduino.h>
+#include <M5CoreInk.h>
+#include <Wire.h>
+#include <SparkFun_SCD30_Arduino_Library.h> //Click here to get the library: http://librarymanager/All#SparkFun_SCD30
 
 // base class GxEPD2_GFX can be used to pass references or pointers to the display instance as parameter, uses ~1.2k more code
 // enable or disable GxEPD2_GFX base class
@@ -13,8 +16,8 @@
 #include <GxEPD2_3C.h>
 #include <GxEPD2_7C.h>
 #include <Fonts/FreeMonoBold9pt7b.h>
-
-GxEPD2_BW<GxEPD2_154_M09, GxEPD2_154_M09::HEIGHT> display(GxEPD2_154_M09(/*CS=D8*/ 9, /*DC=D3*/ 15, /*RST=D4*/ 0, /*BUSY=D2*/ 4)); // GDEH0154D67
+GxEPD2_154_M09 medp = GxEPD2_154_M09(/*CS=D8*/ 9, /*DC=D3*/ 15, /*RST=D4*/ 0, /*BUSY=D2*/ 4);
+GxEPD2_BW<GxEPD2_154_M09, GxEPD2_154_M09::HEIGHT> display(medp); // GDEH0154D67
 
 #if !defined(__AVR) && !defined(_BOARD_GENERIC_STM32F103C_H_)
 
@@ -37,17 +40,32 @@ GxEPD2_BW<GxEPD2_154_M09, GxEPD2_154_M09::HEIGHT> display(GxEPD2_154_M09(/*CS=D8
 #endif
 #endif
 
+#define BUTTON_UP_PIN       37
+#define BUTTON_DOWN_PIN     39
+#define BUTTON_MID_PIN      38
+#define BUTTON_EXT_PIN      5
+#define BUTTON_PWR_PIN      27
+
+#define LED_EXT_PIN         10
+
+#define SPEAKER_PIN         2 
+#define TONE_PIN_CHANNEL    0
+
+#define POWER_HOLD_PIN      12
+
 // note for partial update window and setPartialWindow() method:
 // partial update window size and position is on byte boundary in physical x direction
 // the size is increased in setPartialWindow() if x or w are not multiple of 8 for even rotation, y or h for odd rotation
 // see also comment in GxEPD2_BW.h, GxEPD2_3C.h or GxEPD2_GFX.h for method setPartialWindow()
 
 void drawFont(const char name[], const GFXfont* f);
-void drawBitmaps104x212();
 
 const char HelloWorld[] = "Hello World!";
 const char HelloArduino[] = "Hello Arduino!";
 const char HelloEpaper[] = "Hello E-Paper!";
+
+
+SCD30 airSensor;
 
 
 #ifdef _GxBitmaps200x200_H_
@@ -516,7 +534,28 @@ void drawBitmaps3c400x300()
 void helloWorld()
 {
   //Serial.println("helloWorld");
-  display.setRotation(1);
+  // display.setRotation(1);
+  display.setFont(&FreeMonoBold9pt7b);
+  display.setTextColor(GxEPD_BLACK);
+  int16_t tbx, tby; uint16_t tbw, tbh;
+  display.getTextBounds(HelloWorld, 0, 0, &tbx, &tby, &tbw, &tbh);
+  // center bounding box by transposition of origin:
+  uint16_t x = ((display.width() - tbw) / 2) - tbx;
+  uint16_t y = ((display.height() - tbh) / 2) - tby;
+  // full window mode is the initial mode, set it anyway
+  display.setFullWindow();
+  display.fillScreen(GxEPD_WHITE);
+  display.setCursor(x, y);
+  display.print(HelloWorld);
+  display.display(false); // full update
+  //Serial.println("helloWorld done");
+}
+
+
+void printCO2()
+{
+  //Serial.println("helloWorld");
+  // display.setRotation(1);
   display.setFont(&FreeMonoBold9pt7b);
   display.setTextColor(GxEPD_BLACK);
   int16_t tbx, tby; uint16_t tbw, tbh;
@@ -616,7 +655,7 @@ void helloFullScreenPartialMode()
 
 void helloArduino()
 {
-  //Serial.println("helloArduino");
+  Serial.println("helloArduino");
   display.setRotation(1);
   display.setFont(&FreeMonoBold9pt7b);
   display.setTextColor(display.epd2.hasColor ? GxEPD_RED : GxEPD_BLACK);
@@ -638,12 +677,12 @@ void helloArduino()
   display.print(HelloArduino);
   display.displayWindow(0, wy, display.width(), wh);
   delay(1000);
-  //Serial.println("helloArduino done");
+  Serial.println("helloArduino done");
 }
 
 void helloEpaper()
 {
-  //Serial.println("helloEpaper");
+  Serial.println("helloEpaper");
   display.setRotation(1);
   display.setFont(&FreeMonoBold9pt7b);
   display.setTextColor(display.epd2.hasColor ? GxEPD_RED : GxEPD_BLACK);
@@ -664,7 +703,7 @@ void helloEpaper()
   display.setCursor(x, y);
   display.print(HelloEpaper);
   display.displayWindow(0, wy, display.width(), wh);
-  //Serial.println("helloEpaper done");
+  Serial.println("helloEpaper done");
 }
 
 #if defined(ESP8266) || defined(ESP32)
@@ -684,8 +723,8 @@ class PrintString : public Print, public String
 void helloValue(double v, int digits)
 {
   //Serial.println("helloValue");
-  display.setRotation(1);
-  display.setFont(&FreeMonoBold9pt7b);
+  // display.setRotation(1);
+  // display.setFont(&FreeMonoBold9pt7b);
   display.setTextColor(display.epd2.hasColor ? GxEPD_RED : GxEPD_BLACK);
   PrintString valueString;
   valueString.print(v, digits);
@@ -745,6 +784,7 @@ void deepSleepTest()
   display.display(false); // full update
   display.hibernate();
   delay(5000);
+  M5.shutdown(10);
   display.getTextBounds(wokeup, 0, 0, &tbx, &tby, &tbw, &tbh);
   uint16_t wx = (display.width() - tbw) / 2;
   uint16_t wy = (display.height() / 3) + tbh / 2; // y is base line!
@@ -757,7 +797,8 @@ void deepSleepTest()
   display.setCursor(fx, fy);
   display.print(from);
   display.display(false); // full update
-  delay(5000);
+  M5.shutdown(10);
+  // delay(5000);
   display.getTextBounds(hibernating, 0, 0, &tbx, &tby, &tbw, &tbh);
   uint16_t hx = (display.width() - tbw) / 2;
   uint16_t hy = (display.height() / 3) + tbh / 2; // y is base line!
@@ -772,6 +813,7 @@ void deepSleepTest()
   display.display(false); // full update
   display.hibernate();
   Serial.println("deepSleepTest done");
+  M5.shutdown(10);
 }
 
 void showBox(uint16_t x, uint16_t y, uint16_t w, uint16_t h, bool partial)
@@ -943,42 +985,110 @@ void drawBitmaps()
 #endif
 }
 
-void setup()
-{
-  Serial.begin(115200);
-  Serial.println();
-  Serial.println("setup");
-  delay(100);
-  display.init(115200);
-  // first update should be full refresh
-  helloWorld();
-  delay(1000);
-  // partial refresh mode can be used to full screen,
-  // effective if display panel hasFastPartialUpdate
-  helloFullScreenPartialMode();
-  delay(1000);
-  helloArduino();
-  delay(1000);
-  helloEpaper();
-  delay(1000);
-  //helloValue(123.9, 1);
-  //delay(1000);
-  showFont("FreeMonoBold9pt7b", &FreeMonoBold9pt7b);
-  delay(1000);
-  drawBitmaps();
-  if (display.epd2.hasPartialUpdate)
-  {
-    showPartialUpdate();
-    delay(1000);
-  } // else // on GDEW0154Z04 only full update available, doesn't look nice
-  //drawCornerTest();
-  //showBox(16, 16, 48, 32, false);
-  //showBox(16, 56, 48, 32, true);
-  display.powerOff();
-  deepSleepTest();
-  Serial.println("setup done");
+void setup() {
+    Serial.begin(115200);
+    Serial.println();
+    delay(10);
+    Serial.println("setup");
+    M5.begin(false,false,true);
+    delay(100);
+    M5.update();
+    // if (M5.BtnMID.isPressed()) {
+        display.init(115200);
+        display.setRotation(0);
+        display.setFont(&FreeMonoBold9pt7b);
+        display.setTextColor(GxEPD_BLACK);
+        display.setTextSize(3);
+        display.setFullWindow();
+        // helloWorld();
+        delay(1000);
+    // }
+
+    Wire.begin(25,26);
+
+    if (airSensor.begin(Wire) == false) {
+        Serial.println("Air sensor not detected. Please check wiring. Freezing...");
+        while (1);
+    }
+
+    Serial.println("setup done");
+    delay(10);
 }
 
-void loop()
-{
+void loop() {
+    // first update should be full refresh
+    // helloWorld();
+    // shutdown(10);
+    // delay(1000);
+    // // partial refresh mode can be used to full screen,
+    // // effective if display panel hasFastPartialUpdate
+    // helloFullScreenPartialMode();
+    // delay(1000);
+    // helloArduino();
+    // delay(1000);
+    // helloEpaper();
+    // delay(1000);
+    // //helloValue(123.9, 1);
+    // //delay(1000);
+    // showFont("FreeMonoBold9pt7b", &FreeMonoBold9pt7b);
+    // delay(1000);
+    // drawBitmaps();
+    // if (display.epd2.hasPartialUpdate) {
+        // showPartialUpdate();
+        // delay(1000);
+    // }  // else // on GDEW0154Z04 only full update available, doesn't look nice
+    // //drawCornerTest();
+    // //showBox(16, 16, 48, 32, false);
+    // //showBox(16, 56, 48, 32, true);
+    // display.powerOff();
+    // deepSleepTest();
+
+
+    // uint16_t box_x = 10;
+    // uint16_t box_y = 15;
+    // uint16_t box_w = 70;
+    // uint16_t box_h = 20;
+    // uint16_t cursor_y = box_y + box_h - 6;
+    // float value = 13.95;
+    // uint16_t incr = display.epd2.hasFastPartialUpdate ? 1 : 3;
+    // display.setFont(&FreeMonoBold9pt7b);
+    // display.setTextColor(GxEPD_BLACK);
+    // display.setFullWindow();
+
+    // for (uint16_t r = 0; r < 1; r++) {
+    //     display.setRotation(r);
+    //     for (uint16_t i = 1; i <= 10; i += incr) {
+    //         display.fillRect(box_x, box_y, box_w, box_h, GxEPD_WHITE);
+    //         display.setCursor(box_x, cursor_y);
+    //         display.print(value * i, 2);
+    //         display.displayWindow(box_x, box_y, box_w, box_h);
+    //         delay(500);
+    //     }
+    //     delay(1000);
+    //     display.fillRect(box_x, box_y, box_w, box_h, GxEPD_WHITE);
+    //     display.displayWindow(box_x, box_y, box_w, box_h);
+    //     delay(1000);
+    // }
+    // Serial.println("shutdown");
+    // display.hibernate();
+    // M5.shutdown(15);
+
+    // while(1);
+
+    if (airSensor.dataAvailable()) {
+        Serial.print("co2(ppm):");
+        Serial.print(airSensor.getCO2());
+        helloValue (airSensor.getCO2(),0);
+
+        Serial.print(" temp(C):");
+        Serial.print(airSensor.getTemperature(), 1);
+
+        Serial.print(" humidity(%):");
+        Serial.print(airSensor.getHumidity(), 1);
+
+        Serial.println();
+    } else
+        Serial.print(".");
+
+    delay(1000);
 }
