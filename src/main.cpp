@@ -4,6 +4,10 @@
 #include <Wire.h>
 #include <StreamString.h>
 
+#define DEEP_SLEEP_MODE 1
+#define DEEP_SLEEP_TIME 300 // seconds
+#define DISABLE_LED
+
 // base class GxEPD2_GFX can be used to pass references or pointers to the display instance as parameter, uses ~1.2k more code
 // enable or disable GxEPD2_GFX base class
 #define ENABLE_GxEPD2_GFX 0
@@ -58,7 +62,7 @@ void helloFullScreenPartialModeCallback(const void*) {
     display.setTextSize(2);
     display.setCursor(x, y);
     display.setFont(&FreeMonoBold18pt7b);
-    display.print(String(co2value).c_str());
+    display.printf("%04i",co2value);
 
     display.setFont(&FreeMonoBold9pt7b);
     x = display.width() / 2 - 14;
@@ -168,9 +172,17 @@ void setup() {
     delay(10);
     Serial.println("setup");
 
+#ifdef DISABLE_LED    // turnoff it for improve battery life
+    pinMode(LED_EXT_PIN, OUTPUT);
+    digitalWrite(LED_EXT_PIN, HIGH);   
+#endif
+
     M5.begin(false, false, true);
+
     co2sensorInit();
+
     display.init(115200,false);
+
     M5.update();
     if (M5.BtnMID.isPressed()) {
         helloWorld();
@@ -191,11 +203,14 @@ void loop() {
     }
 
     if (drawReady) {
-        display.display();
-        // display.hibernate();
-        display.powerOff();
-        M5.shutdown(60);
-        delay(60000);
+        if (DEEP_SLEEP_MODE == 1) {
+            display.display();
+            display.powerOff();
+            M5.shutdown(DEEP_SLEEP_TIME);
+            delay(DEEP_SLEEP_TIME * 1000);
+        }
+        else {
+            delay(500);
+        }
     }
-
 }
