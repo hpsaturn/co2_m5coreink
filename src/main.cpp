@@ -20,7 +20,6 @@
 #include <Fonts/FreeMonoBold18pt7b.h>
 #include <Fonts/FreeMonoBold12pt7b.h>
 #include <Fonts/FreeMonoBold24pt7b.h>
-
 #include "bitmaps/Bitmaps200x200.h"  // 1.54" b/w
 
 GxEPD2_154_M09 medp = GxEPD2_154_M09(/*CS=D8*/ 9, /*DC=D3*/ 15, /*RST=D4*/ 0, /*BUSY=D2*/ 4);
@@ -116,6 +115,33 @@ bool sensorsLoop() {
     return false;
 }
 
+void co2sensorInit() {
+    Wire.begin(25, 26);
+    if (airSensor.begin(Wire) == false) {
+        Serial.println("Air sensor not detected. Please check wiring. Freezing...");
+        while (1);
+    }
+    while(airSensor.setMeasurementInterval(20));  //Change number of seconds between measurements: 2 to 1800 (30 minutes)
+
+    //Read altitude compensation value
+    unsigned int altitude = airSensor.getAltitudeCompensation();
+    Serial.print("Current altitude: ");
+    Serial.print(altitude);
+    Serial.println("m");
+
+    //My desk is ~1600m above sealevel
+    airSensor.setAltitudeCompensation(34);  //Set altitude of the sensor in m, stored in non-volatile memory of SCD30
+
+    //Pressure in Boulder, CO is 24.65inHg or 834.74mBar
+    airSensor.setAmbientPressure(999);  //Current ambient pressure in mBar: 700 to 1200, will overwrite altitude compensation
+
+    //Read temperature offset
+    float offset = airSensor.getTemperatureOffset();
+    Serial.print("Current temp offset: ");
+    Serial.print(offset, 2);
+    Serial.println("C");
+    airSensor.setTemperatureOffset(5);
+}
 
 void runDemo() {
     // first update should be full refresh
@@ -133,19 +159,13 @@ void setup() {
     Serial.println();
     delay(10);
     Serial.println("setup");
-    Wire.begin(25, 26);
-    if (airSensor.begin(Wire) == false) {
-        Serial.println("Air sensor not detected. Please check wiring. Freezing...");
-        while (1);
-    }
+
     M5.begin(false, false, true);
-    delay(100);
-    M5.update();
+    delay(1000);
+    co2sensorInit();
+    delay(1000);
     display.init(115200,true);
-    display.setRotation(0);
-    display.setFont(&FreeMonoBold12pt7b);
-    display.setTextSize(1);
-    display.setTextColor(GxEPD_BLACK);
+    M5.update();
     if (M5.BtnMID.isPressed()) {
         helloWorld();
         delay(1000);
