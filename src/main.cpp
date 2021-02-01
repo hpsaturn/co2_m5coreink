@@ -176,8 +176,10 @@ void setup() {
     M5.update();
     if (M5.BtnMID.isPressed()) {
         helloWorld();
-        delay(1000);
+        helloFullScreenPartialMode();
     }
+    //helloWorld();
+    delay(100);
     Serial.println("setup done");
 }
 
@@ -186,15 +188,16 @@ void loop() {
         count++;
         if (count > 2) {
             helloFullScreenPartialMode();
-            delay(1000);
             count = 0;
         }
     }
 
     if (drawReady) {
+        display.display();
+        // display.hibernate();
         display.powerOff();
-        delay(2000);
         M5.shutdown(10);
+        delay(2000);
     }
 
     delay(500);
