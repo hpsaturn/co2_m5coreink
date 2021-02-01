@@ -29,6 +29,7 @@ SCD30 airSensor;
 uint16_t co2value = 0;
 float co2temp, co2humi;
 uint16_t count;
+bool drawReady;
 
 void helloWorldCallback(const void*) {
     uint16_t x = 15;
@@ -50,6 +51,7 @@ void helloWorld() {
 }
 
 void helloFullScreenPartialModeCallback(const void*) {
+    Serial.print("drawing..");
     uint16_t x = 15;
     uint16_t y = display.height() / 2 - 30;
     display.fillScreen(GxEPD_WHITE);
@@ -77,15 +79,16 @@ void helloFullScreenPartialModeCallback(const void*) {
     display.setCursor(x, y);
     display.printf("Humi: %.2f%%",co2humi);
 
-    // delay(1000);
-    // display.hibernate();
-    // display.powerOff();
-    // M5.shutdown(10);
-    delay(2000);
+    delay(100);
+
+    drawReady = true;
+    Serial.println("done");
+
 }
 
 void helloFullScreenPartialMode() {
     //Serial.println("helloFullScreenPartialMode");
+    drawReady = false;
     display.setPartialWindow(0, 0, display.width(), display.height());
     display.setRotation(0);
     display.setFont(&FreeMonoBold24pt7b);
@@ -115,13 +118,18 @@ bool sensorsLoop() {
     return false;
 }
 
+void co2sensorSetInterval(uint16_t sec) {
+    airSensor.sendCommand(0x0104); // stop continous mesaurements
+    delay(100);
+    while(!airSensor.setMeasurementInterval(sec));  //Change number of seconds between measurements: 2 to 1800 (30 minutes)
+}
+
 void co2sensorInit() {
     Wire.begin(25, 26);
     if (airSensor.begin(Wire) == false) {
         Serial.println("Air sensor not detected. Please check wiring. Freezing...");
         while (1);
     }
-    while(airSensor.setMeasurementInterval(20));  //Change number of seconds between measurements: 2 to 1800 (30 minutes)
 
     //Read altitude compensation value
     unsigned int altitude = airSensor.getAltitudeCompensation();
@@ -140,7 +148,7 @@ void co2sensorInit() {
     Serial.print("Current temp offset: ");
     Serial.print(offset, 2);
     Serial.println("C");
-    airSensor.setTemperatureOffset(5);
+    // airSensor.setTemperatureOffset(5);
 }
 
 void runDemo() {
@@ -164,17 +172,30 @@ void setup() {
     delay(1000);
     co2sensorInit();
     delay(1000);
-    display.init(115200,true);
+    display.init(115200,false);
     M5.update();
     if (M5.BtnMID.isPressed()) {
         helloWorld();
         delay(1000);
     }
-    helloWorld();
     Serial.println("setup done");
-    delay(2000);
 }
 
 void loop() {
-    while(!sensorsLoop())helloFullScreenPartialMode();
+    if (sensorsLoop()) {
+        count++;
+        if (count > 2) {
+            helloFullScreenPartialMode();
+            delay(1000);
+            count = 0;
+        }
+    }
+
+    if (drawReady) {
+        display.powerOff();
+        delay(2000);
+        M5.shutdown(10);
+    }
+
+    delay(500);
 }
