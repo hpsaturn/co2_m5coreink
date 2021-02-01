@@ -169,9 +169,7 @@ void setup() {
     Serial.println("setup");
 
     M5.begin(false, false, true);
-    delay(1000);
     co2sensorInit();
-    delay(1000);
     display.init(115200,false);
     M5.update();
     if (M5.BtnMID.isPressed()) {
@@ -196,9 +194,8 @@ void loop() {
         display.display();
         // display.hibernate();
         display.powerOff();
-        M5.shutdown(10);
-        delay(2000);
+        M5.shutdown(60);
+        delay(60000);
     }
 
-    delay(500);
 }
