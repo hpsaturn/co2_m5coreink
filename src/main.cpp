@@ -4,9 +4,11 @@
 #include <Wire.h>
 #include <StreamString.h>
 
-#define DEEP_SLEEP_MODE 1
-#define DEEP_SLEEP_TIME 300 // seconds
-#define DISABLE_LED
+#define DEEP_SLEEP_MODE       1     // eInk and esp32 hibernate
+#define DEEP_SLEEP_TIME     120     // seconds
+#define POWERUP_INTERVAL     20    // seconds
+#define SAMPLES_COUNT         3     // samples before suspend
+#define DISABLE_LED                 // improve battery
 
 // base class GxEPD2_GFX can be used to pass references or pointers to the display instance as parameter, uses ~1.2k more code
 // enable or disable GxEPD2_GFX base class
@@ -128,7 +130,7 @@ void co2sensorSetInterval(uint16_t sec) {
     while(!airSensor.setMeasurementInterval(sec));  //Change number of seconds between measurements: 2 to 1800 (30 minutes)
 }
 
-void co2sensorInit() {
+void co2sensorInit(bool calibrate = false) {
     Wire.begin(25, 26);
     if (airSensor.begin(Wire) == false) {
         Serial.println("Air sensor not detected. Please check wiring. Freezing...");
@@ -153,6 +155,8 @@ void co2sensorInit() {
     Serial.print(offset, 2);
     Serial.println("C");
     // airSensor.setTemperatureOffset(5);
+
+    if(calibrate) airSensor.setForcedRecalibrationFactor(400);
 }
 
 void runDemo() {
@@ -186,6 +190,7 @@ void setup() {
     M5.update();
     if (M5.BtnMID.isPressed()) {
         helloWorld();
+        while(!sensorsLoop());
         helloFullScreenPartialMode();
     }
     //helloWorld();
@@ -196,7 +201,7 @@ void setup() {
 void loop() {
     if (sensorsLoop()) {
         count++;
-        if (count > 2) {
+        if (count == SAMPLES_COUNT) {
             helloFullScreenPartialMode();
             count = 0;
         }
@@ -204,13 +209,13 @@ void loop() {
 
     if (drawReady) {
         if (DEEP_SLEEP_MODE == 1) {
-            display.display();
+            display.display(false);
             display.powerOff();
             M5.shutdown(DEEP_SLEEP_TIME);
-            delay(DEEP_SLEEP_TIME * 1000);
+            delay(POWERUP_INTERVAL * 1000);  // it only is reached when the USB is connected
         }
         else {
-            delay(500);
+            delay(POWERUP_INTERVAL * 1000);
         }
     }
 }
