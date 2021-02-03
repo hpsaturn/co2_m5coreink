@@ -5,10 +5,11 @@
 #include <StreamString.h>
 
 #define DEEP_SLEEP_MODE       1     // eInk and esp32 hibernate
-#define DEEP_SLEEP_TIME     120     // seconds
-#define POWERUP_INTERVAL     20    // seconds
-#define SAMPLES_COUNT         3     // samples before suspend
+#define DEEP_SLEEP_TIME      60     // seconds
+#define SAMPLES_COUNT         4     // samples before suspend
+#define LOOP_DELAY            2     // seconds
 #define DISABLE_LED                 // improve battery
+
 
 // base class GxEPD2_GFX can be used to pass references or pointers to the display instance as parameter, uses ~1.2k more code
 // enable or disable GxEPD2_GFX base class
@@ -36,6 +37,7 @@ uint16_t co2value = 0;
 float co2temp, co2humi;
 uint16_t count;
 bool drawReady;
+bool isCharging;
 
 void helloWorldCallback(const void*) {
     uint16_t x = 15;
@@ -209,13 +211,14 @@ void loop() {
 
     if (drawReady) {
         if (DEEP_SLEEP_MODE == 1) {
-            display.display(false);
+            display.display(isCharging);
             display.powerOff();
             M5.shutdown(DEEP_SLEEP_TIME);
-            delay(POWERUP_INTERVAL * 1000);  // it only is reached when the USB is connected
+            delay(LOOP_DELAY * 1000);  // it only is reached when the USB is connected
+            isCharging = true;
         }
         else {
-            delay(POWERUP_INTERVAL * 1000);
+            delay(LOOP_DELAY * 1000);
         }
     }
 }
