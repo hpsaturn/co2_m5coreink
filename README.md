@@ -18,7 +18,8 @@ Source code and 3DPrint files for making a CO2 hat for M5CoreInk/M5StickC (or an
 
 # How to build it
 
-![Youtube video of M5CoreInk CO2 hat](images/youtube.jpg)
+<a href="https://youtu.be/im0LNFRrHCg" target="_blank"><img src="images/youtube.jpg"></a>
+
 
 # Firmware upload
 
