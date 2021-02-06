@@ -1,8 +1,8 @@
 #include <Arduino.h>
 #include <M5CoreInk.h>
-#include <SparkFun_SCD30_Arduino_Library.h>  //Click here to get the library: http://librarymanager/All#SparkFun_SCD30
 #include <Wire.h>
 #include <StreamString.h>
+#include <SparkFun_SCD30_Arduino_Library.h>  //Click here to get the library: http://librarymanager/All#SparkFun_SCD30
 
 #define DEEP_SLEEP_MODE       1     // eInk and esp32 hibernate
 #define DEEP_SLEEP_TIME      60     // seconds
@@ -10,15 +10,7 @@
 #define LOOP_DELAY            2     // seconds
 #define DISABLE_LED                 // improve battery
 
-
-// base class GxEPD2_GFX can be used to pass references or pointers to the display instance as parameter, uses ~1.2k more code
-// enable or disable GxEPD2_GFX base class
 #define ENABLE_GxEPD2_GFX 0
-
-// uncomment next line to use class GFX of library GFX_Root instead of Adafruit_GFX
-//#include <GFX.h>
-// Note: if you use this with ENABLE_GxEPD2_GFX 1:
-//       uncomment it in GxEPD2_GFX.h too, or add #include <GFX.h> before any #include <GxEPD2_GFX.h>
 
 #include <GxEPD2_BW.h>
 #include <GxEPD2_3C.h>
@@ -91,6 +83,12 @@ void displayCO2ValuesCallback(const void*) {
 
 }
 
+/**
+ * Display CO2 values in partialMode update.
+ *  
+ * it is a partial refresh mode can be used to full screen,
+ * effective if display panel hasFastPartialUpdate
+ */
 void displayCO2ValuesPartialMode() {
     Serial.println("displayCO2ValuesPartialMode");
     Serial.print("drawing..");
@@ -162,22 +160,10 @@ void co2sensorInit() {
     }
 }
 
-void runDemo() {
-    // first update should be full refresh
-    displayHome();
-    delay(1000);
-    // partial refresh mode can be used to full screen,
-    // effective if display panel hasFastPartialUpdate
-    displayCO2ValuesPartialMode();
-    delay(1000);
-    // helloArduino();
-}
-
 void setup() {
     Serial.begin(115200);
     Serial.println();
-    delay(10);
-    Serial.println("setup");
+    Serial.println("setup init");
 
 #ifdef DISABLE_LED    // turnoff it for improve battery life
     pinMode(LED_EXT_PIN, OUTPUT);
@@ -196,7 +182,7 @@ void setup() {
         while(!sensorsLoop());
         displayCO2ValuesPartialMode();
     }
-    //helloWorld();
+
     delay(100);
     Serial.println("setup done");
 }
