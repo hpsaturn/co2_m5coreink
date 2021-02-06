@@ -6,7 +6,7 @@
 
 #define DEEP_SLEEP_MODE       1     // eInk and esp32 hibernate
 #define DEEP_SLEEP_TIME      60     // seconds
-#define SAMPLES_COUNT         4     // samples before suspend
+#define SAMPLES_COUNT         2     // samples before suspend
 #define LOOP_DELAY            2     // seconds
 #define DISABLE_LED                 // improve battery
 
@@ -39,7 +39,7 @@ uint16_t count;
 bool drawReady;
 bool isCharging;
 
-void helloWorldCallback(const void*) {
+void displayHomeCallback(const void*) {
     uint16_t x = 15;
     uint16_t y = display.height() / 2 - 30;
     display.fillScreen(GxEPD_WHITE);
@@ -47,19 +47,16 @@ void helloWorldCallback(const void*) {
     display.print("0000");
 }
 
-void helloWorld() {
-    //Serial.println("helloWorld");
+void displayHome() {
     display.setRotation(0);
     display.setFont(&FreeMonoBold18pt7b);
     display.setTextSize(2);
     display.setTextColor(GxEPD_BLACK);
     display.setFullWindow();
-    display.drawPaged(helloWorldCallback, 0);
-    //Serial.println("helloWorld done");
+    display.drawPaged(displayHomeCallback, 0);
 }
 
-void helloFullScreenPartialModeCallback(const void*) {
-    Serial.print("drawing..");
+void displayCO2ValuesCallback(const void*) {
     uint16_t x = 15;
     uint16_t y = display.height() / 2 - 30;
     display.fillScreen(GxEPD_WHITE);
@@ -94,16 +91,16 @@ void helloFullScreenPartialModeCallback(const void*) {
 
 }
 
-void helloFullScreenPartialMode() {
-    //Serial.println("helloFullScreenPartialMode");
+void displayCO2ValuesPartialMode() {
+    Serial.println("displayCO2ValuesPartialMode");
+    Serial.print("drawing..");
     drawReady = false;
     display.setPartialWindow(0, 0, display.width(), display.height());
     display.setRotation(0);
     display.setFont(&FreeMonoBold24pt7b);
     display.setTextSize(1);
     display.setTextColor(GxEPD_BLACK);
-    display.drawPaged(helloFullScreenPartialModeCallback, 0);
-    //Serial.println("helloFullScreenPartialMode done");
+    display.drawPaged(displayCO2ValuesCallback, 0);
 }
 
 bool sensorsLoop() {
@@ -132,12 +129,7 @@ void co2sensorSetInterval(uint16_t sec) {
     while(!airSensor.setMeasurementInterval(sec));  //Change number of seconds between measurements: 2 to 1800 (30 minutes)
 }
 
-void co2sensorInit(bool calibrate = false) {
-    Wire.begin(25, 26);
-    if (airSensor.begin(Wire) == false) {
-        Serial.println("Air sensor not detected. Please check wiring. Freezing...");
-        while (1);
-    }
+void co2sensorConfig(bool calibrate = false) {
 
     //Read altitude compensation value
     unsigned int altitude = airSensor.getAltitudeCompensation();
@@ -145,29 +137,38 @@ void co2sensorInit(bool calibrate = false) {
     Serial.print(altitude);
     Serial.println("m");
 
-    //My desk is ~1600m above sealevel
-    airSensor.setAltitudeCompensation(34);  //Set altitude of the sensor in m, stored in non-volatile memory of SCD30
-
-    //Pressure in Boulder, CO is 24.65inHg or 834.74mBar
-    airSensor.setAmbientPressure(999);  //Current ambient pressure in mBar: 700 to 1200, will overwrite altitude compensation
-
     //Read temperature offset
     float offset = airSensor.getTemperatureOffset();
     Serial.print("Current temp offset: ");
     Serial.print(offset, 2);
     Serial.println("C");
-    // airSensor.setTemperatureOffset(5);
+    
+    //Pressure in Boulder, CO is 24.65inHg or 834.74mBar
+    while(!airSensor.setAmbientPressure(999));  //Current ambient pressure in mBar: 700 to 1200, will overwrite altitude compensation
 
-    if(calibrate) airSensor.setForcedRecalibrationFactor(400);
+    if(calibrate) {
+        while(!airSensor.setAltitudeCompensation(34));  // Set altitude of the sensor in m, stored in non-volatile memory
+        while(!airSensor.setTemperatureOffset(5));
+        // while(!airSensor.setAutoSelfCalibration(false));
+        // while(!airSensor.setForcedRecalibrationFactor(400));
+    }
+}
+
+void co2sensorInit() {
+    Wire.begin(25, 26);
+    if (airSensor.begin(Wire) == false) {
+        Serial.println("Air sensor not detected. Please check wiring. Freezing...");
+        while (1);
+    }
 }
 
 void runDemo() {
     // first update should be full refresh
-    helloWorld();
+    displayHome();
     delay(1000);
     // partial refresh mode can be used to full screen,
     // effective if display panel hasFastPartialUpdate
-    helloFullScreenPartialMode();
+    displayCO2ValuesPartialMode();
     delay(1000);
     // helloArduino();
 }
@@ -182,18 +183,18 @@ void setup() {
     pinMode(LED_EXT_PIN, OUTPUT);
     digitalWrite(LED_EXT_PIN, HIGH);   
 #endif
-
-    M5.begin(false, false, true);
-
+    
     co2sensorInit();
 
+    M5.begin(false, false, true);
     display.init(115200,false);
 
     M5.update();
     if (M5.BtnMID.isPressed()) {
-        helloWorld();
+        co2sensorConfig();
+        displayHome();
         while(!sensorsLoop());
-        helloFullScreenPartialMode();
+        displayCO2ValuesPartialMode();
     }
     //helloWorld();
     delay(100);
@@ -204,21 +205,23 @@ void loop() {
     if (sensorsLoop()) {
         count++;
         if (count == SAMPLES_COUNT) {
-            helloFullScreenPartialMode();
+            displayCO2ValuesPartialMode();
             count = 0;
         }
     }
 
     if (drawReady) {
         if (DEEP_SLEEP_MODE == 1) {
+            Serial.println("Deep sleep..");
             display.display(isCharging);
             display.powerOff();
             M5.shutdown(DEEP_SLEEP_TIME);
-            delay(LOOP_DELAY * 1000);  // it only is reached when the USB is connected
-            isCharging = true;
+            Serial.println("USB is connected..");
+            isCharging = true;              // it only is reached when the USB is connected
+            Serial.println("Deep sleep done.");
         }
-        else {
-            delay(LOOP_DELAY * 1000);
-        }
+        drawReady = false;
     }
+
+    delay(LOOP_DELAY * 1000);
 }
