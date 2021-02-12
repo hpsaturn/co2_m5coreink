@@ -8,6 +8,8 @@
 #define DEEP_SLEEP_TIME      60     // seconds
 #define SAMPLES_COUNT         2     // samples before suspend
 #define LOOP_DELAY            2     // seconds
+#define BEEP_ENABLE           1     // eneble high level alarm
+#define ALARM_BEEP_VALUE   2500     // ppm level to trigger alarm
 #define DISABLE_LED                 // improve battery
 
 #define ENABLE_GxEPD2_GFX 0
@@ -160,6 +162,12 @@ void co2sensorInit() {
     }
 }
 
+void beep() {
+    M5.Speaker.tone(2000, 50);
+    delay(30);
+    M5.Speaker.mute();
+}
+
 void setup() {
     Serial.begin(115200);
     Serial.println();
@@ -192,6 +200,7 @@ void loop() {
         count++;
         if (count == SAMPLES_COUNT) {
             displayCO2ValuesPartialMode();
+            if(BEEP_ENABLE == 1 && co2value > ALARM_BEEP_VALUE ) beep();
             count = 0;
         }
     }
