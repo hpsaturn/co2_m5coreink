@@ -2,6 +2,20 @@
 
 Source code and 3DPrint files for making a CO2 hat for M5CoreInk/M5StickC (or any ESP32 compatible board), this use a Sensirion SCD30 sensor for get CO2 values.
 
+# Features
+
+- [x] Partial update (fast refresh without blink) in USB mode
+- [x] 5 sec measure rate in USB mode
+- [x] 60 sec measure rate in Battery mode
+- [x] Low power consumption in Battery mode (Deep sleep via RTC)
+- [x] Able to set beep alarm
+- [x] Redraw complete screen via midle button
+- [ ] NTP sync via WiFi or Bluetooth
+- [ ] Compatibility with [CanAirIO](https://canair.io) firmware
+- [ ] GATT server for notifications
+
+---
+
 ![M5coreInk CO2 hat](images/collage.jpg)
 
 # Components
