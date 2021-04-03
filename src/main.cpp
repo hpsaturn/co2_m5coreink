@@ -5,7 +5,7 @@
 #include <SparkFun_SCD30_Arduino_Library.h>  //Click here to get the library: http://librarymanager/All#SparkFun_SCD30
 
 #define DEEP_SLEEP_MODE       1     // eInk and esp32 hibernate
-#define DEEP_SLEEP_TIME      60     // seconds
+#define DEEP_SLEEP_TIME     240     // seconds
 #define SAMPLES_COUNT         2     // samples before suspend
 #define LOOP_DELAY            2     // seconds
 #define BEEP_ENABLE           1     // eneble high level alarm
