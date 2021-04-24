@@ -5,7 +5,7 @@
 #include <SparkFun_SCD30_Arduino_Library.h>  //Click here to get the library: http://librarymanager/All#SparkFun_SCD30
 
 #define DEEP_SLEEP_MODE       1     // eInk and esp32 hibernate
-#define DEEP_SLEEP_TIME     240     // seconds
+#define DEEP_SLEEP_TIME      20     // seconds
 #define SAMPLES_COUNT         2     // samples before suspend
 #define LOOP_DELAY            2     // seconds
 #define BEEP_ENABLE           1     // eneble high level alarm
@@ -181,15 +181,18 @@ void setup() {
     co2sensorInit();
 
     M5.begin(false, false, true);
-    display.init(115200,false);
-
     M5.update();
+
     if (M5.BtnMID.isPressed()) {
+        display.init(115200,true);
         co2sensorConfig();
         displayHome();
         while(!sensorsLoop());
         displayCO2ValuesPartialMode();
     }
+    else
+        display.init(115200,false);
+
 
     delay(100);
     Serial.println("setup done");
@@ -208,8 +211,9 @@ void loop() {
     if (drawReady) {
         if (DEEP_SLEEP_MODE == 1) {
             Serial.println("Deep sleep..");
-            display.display(isCharging);
+            display.display(true);
             display.powerOff();
+            // display.hibernate();
             M5.shutdown(DEEP_SLEEP_TIME);
             Serial.println("USB is connected..");
             isCharging = true;              // it only is reached when the USB is connected
