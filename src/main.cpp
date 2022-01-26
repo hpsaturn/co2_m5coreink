@@ -4,7 +4,7 @@
 #include <StreamString.h>
 
 #define DEEP_SLEEP_MODE       1     // eInk and esp32 hibernate
-#define DEEP_SLEEP_TIME     600     // seconds
+#define DEEP_SLEEP_TIME     600     // seconds (600s = 10min)
 #define SAMPLES_COUNT         5     // samples before suspend
 #define LOOP_DELAY            2     // seconds
 #define BEEP_ENABLE           1     // eneble high level alarm
@@ -122,11 +122,12 @@ bool sensorsLoop() {
 
 void sensorsInit() {
     Serial.println("-->[SETUP] Detecting sensors..");
-    Wire.begin(32, 33);
-    sensors.setSampleTime(1);                       // config sensors sample time interval
-    sensors.setDebugMode(true);                     // [optional] debug mode
-    sensors.detectI2COnly(true);                    // disable force to only i2c sensors
-    sensors.init();                                 // Auto detection to UART and i2c sensors
+    Wire.begin(32, 33);           // I2C external port (bottom connector)
+    // Wire.begin(25, 26);        // I2C via Hat (top connector)
+    sensors.setSampleTime(1);     // config sensors sample time interval
+    sensors.setDebugMode(true);   // [optional] debug mode
+    sensors.detectI2COnly(true);  // disable force to only i2c sensors
+    sensors.init();               // Auto detection to UART and i2c sensors
 }
 
 void beep() {
