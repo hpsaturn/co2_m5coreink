@@ -4,7 +4,7 @@
 #include <StreamString.h>
 
 #define DEEP_SLEEP_MODE       1     // eInk and esp32 hibernate
-#define DEEP_SLEEP_TIME     600     // seconds (600s = 10min)
+#define DEEP_SLEEP_TIME     120     // seconds (600s = 10min)
 #define SAMPLES_COUNT         5     // samples before suspend
 #define LOOP_DELAY            2     // seconds
 #define BEEP_ENABLE           1     // eneble high level alarm
@@ -27,7 +27,7 @@ GxEPD2_BW<GxEPD2_154_M09, GxEPD2_154_M09::HEIGHT> display(medp);  // GDEH0154D67
 
 uint16_t co2value = 0;
 uint16_t pm25value = 0;
-float co2temp, co2humi;
+float co2temp, co2humi, pressure;
 uint16_t count;
 bool drawReady;
 bool isCharging;
@@ -70,17 +70,22 @@ void displayCO2ValuesCallback(const void*) {
 
     x = 11;
 
-    y = display.height() / 2 + 30;
+    y = display.height() / 2 + 25;
     display.setCursor(x, y);
-    display.printf("PM25: %04d",pm25value);
+    display.printf("Pm25: %04d",pm25value);
 
-    y = display.height() / 2 + 50;
+    y = display.height() / 2 + 45;
     display.setCursor(x, y);
-    display.printf("Temp: %.2fC",co2temp);
+    display.printf("Co2T: %.2fC",co2temp);
 
-    y = display.height() / 2 + 70;
+    y = display.height() / 2 + 65;
     display.setCursor(x, y);
-    display.printf("Humi: %.2f%%",co2humi);
+    display.printf("Co2H: %.2f%%",co2humi);
+
+    y = display.height() / 2 + 85;
+    display.setCursor(x, y);
+    display.printf("Pres: %04.1f", pressure);
+
 
     delay(100);
 
@@ -108,13 +113,12 @@ void displayCO2ValuesPartialMode() {
 }
 
 bool sensorsLoop() {
-    sensors.loop();
-    delay(500);
-    if (co2value != sensors.getCO2()) {
+    if (sensors.readAllSensors()) {
         co2value = sensors.getCO2();
         co2temp = sensors.getCO2temp();
         co2humi = sensors.getCO2humi();
         pm25value = sensors.getPM25();
+        pressure = sensors.getPressure();
         return true;
     }
     return false;
@@ -123,7 +127,7 @@ bool sensorsLoop() {
 void sensorsInit() {
     Serial.println("-->[SETUP] Detecting sensors..");
     Wire.begin(32, 33);           // I2C external port (bottom connector)
-    // Wire.begin(25, 26);        // I2C via Hat (top connector)
+    Wire1.begin(25, 26);          // I2C via Hat (top connector)
     sensors.setSampleTime(1);     // config sensors sample time interval
     sensors.setDebugMode(true);   // [optional] debug mode
     sensors.detectI2COnly(true);  // disable force to only i2c sensors
@@ -146,9 +150,8 @@ void setup() {
     digitalWrite(LED_EXT_PIN, HIGH);   
 #endif
     
-    sensorsInit();
-
     M5.begin(false, false, true);
+    sensorsInit();
     display.init(115200,false);
 
     M5.update();
