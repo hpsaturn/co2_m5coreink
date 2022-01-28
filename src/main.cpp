@@ -26,7 +26,7 @@
 #include <StreamString.h>
 
 #define DEEP_SLEEP_MODE       1     // eInk and esp32 hibernate
-#define DEEP_SLEEP_TIME      30     // *** !! Please change it !! *** to 600s (10m) or more 
+#define DEEP_SLEEP_TIME     600     // *** !! Please change it !! *** to 600s (10m) or more 
 #define MAX_SAMPLES_COUNT     8     // samples before suspend and show (for PM2.5 ~9, 18sec or more)
 #define BEEP_ENABLE           1     // eneble high level alarm
 #define PM25_ALARM_BEEP      50     // PM2.5 level to trigger alarm
@@ -103,14 +103,11 @@ void displayMainValue(UNIT unit){
 
 void displayValuesCallback(const void*) {
     displayMainValue(mainUnit);
-    uint16_t x = 15;
-    uint16_t y = display.height() / 2 - 30;
-    display.setFont(&FreeMonoBold12pt7b);
-    display.setTextSize(1);
-    x = 11;
-    y = display.height() / 2 + 25;
-    display.setCursor(x, y);
+    uint16_t x = 11;
+    uint16_t y = display.height() / 2 + 25;
     String minorName = sensors.getUnitName(minorUnit);
+    display.setCursor(x, y);
+    display.setFont(&FreeMonoBold12pt7b);
     display.printf("%5s: %04d", minorName.c_str(), (uint16_t)sensors.getUnitValue(minorUnit));
 
     y = display.height() / 2 + 45;
@@ -254,6 +251,19 @@ void beep() {
     M5.Speaker.mute();
 }
 
+void shutdown() {
+    if (DEEP_SLEEP_MODE == 1) {
+        Serial.println("-->[LOOP] Deep sleep..");
+        display.display(isCharging);
+        display.powerOff();
+        M5.shutdown(DEEP_SLEEP_TIME);
+        Serial.println("-->[LOOP] USB is connected..");
+        isCharging = true;  // it only is reached when the USB is connected
+        simulateDeepSleep();
+        Serial.println("-->[LOOP] Deep sleep done.");
+    }
+}
+
 /// sensors callback, here we can get the values
 void onSensorDataOk() {
     getSensorsUnits();  // instead of readAllSensors(). See the lib examples
@@ -273,16 +283,7 @@ void onSensorDataOk() {
 
     if (drawReady) {
         resetVariables(); // only for demostration connection and reconnection sensors
-        if (DEEP_SLEEP_MODE == 1) {
-            Serial.println("-->[LOOP] Deep sleep..");
-            display.display(isCharging);
-            display.powerOff();
-            M5.shutdown(DEEP_SLEEP_TIME);
-            Serial.println("-->[LOOP] USB is connected..");
-            isCharging = true;              // it only is reached when the USB is connected
-            simulateDeepSleep();
-            Serial.println("-->[LOOP] Deep sleep done.");
-        }
+        shutdown();        
         drawReady = false;
     }
 }
@@ -290,7 +291,12 @@ void onSensorDataOk() {
 void onSensorNoData(const char * msg) {
     Serial.println("-->[MAIN] No data");
     resetVariables();
-    displayPartialMode(displayValuesCallback);
+    if (drawReady) {
+        resetVariables(); // only for demostration connection and reconnection sensors
+        shutdown();        
+        drawReady = false;
+    }
+    else displayPartialMode(displayValuesCallback);
 }
 
 void checkButtons() {
@@ -298,10 +304,8 @@ void checkButtons() {
     if (M5.BtnMID.isPressed()) {
         displayHome();
         sensors.readAllSensors();
-        delay(1000);
-        sensors.readAllSensors();
-        displayPartialMode(displayValuesCallback);
         beep();
+        displayPartialMode(displayValuesCallback);
     }
     if (M5.BtnUP.isPressed()) {
         displayHome();
@@ -313,9 +317,10 @@ void checkButtons() {
             displayPartialMode(calibrationTitleCallback);
             if (M5.BtnMID.wasPressed()) {
                 beep(); 
-                delay(500);
+                delay(300);
                 beep();
-                delay(500);
+                delay(300);
+                sensors.setCO2RecalibrationFactor(400);
                 displayMessageTitle(calibrationReadyCallBack);
                 break;
             }
