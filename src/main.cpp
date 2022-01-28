@@ -24,10 +24,11 @@
 #include <M5CoreInk.h>
 #include <Sensors.hpp>
 #include <StreamString.h>
+#include <rom/rtc.h>
 
 #define DEEP_SLEEP_MODE       1     // eInk and esp32 hibernate
-#define DEEP_SLEEP_TIME      60     // Please change it to 600s (10m) or more 
-#define SAMPLES_COUNT         2     // samples before suspend (for PM2.5 ~9, 18sec, or more)
+#define DEEP_SLEEP_TIME      20     // Please change it to 600s (10m) or more 
+#define SAMPLES_COUNT         8     // samples before suspend (for PM2.5 ~9, 18sec, or more)
 #define LOOP_DELAY            2     // seconds
 #define BEEP_ENABLE           1     // eneble high level alarm
 #define PM25_ALARM_BEEP      50     // PM2.5 level to trigger alarm
@@ -87,7 +88,7 @@ void displayCO2ValuesCallback(const void*) {
     display.setFont(&FreeMonoBold9pt7b);
     String mainUnitSymbol = sensors.getUnitName(mainUnit)+" / "+sensors.getUnitSymbol(mainUnit);
     uint16_t lenght = mainUnitSymbol.length();
-    x = (display.width() / 2) - ((lenght*10)/2);
+    x = (display.width() / 2) - ((lenght*11)/2);
     y = display.height() / 2 - 8;
     display.setTextSize(0);
     display.setCursor(x, y);
@@ -162,15 +163,19 @@ void getSensorsUnits() {
             mainUnit = unit;       // and is shown in main unit field
         } else if (unit == UNIT::PM10 && minorUnit == UNIT::NUNIT) {
             minorUnit = unit;
-        } else if (unit == UNIT::TEMP || unit == UNIT::CO2TEMP) {
+        }
+        if (unit == UNIT::TEMP || unit == UNIT::CO2TEMP) {
             tempUnit = unit;
             if (mainUnit == UNIT::NUNIT) mainUnit = unit;
-        } else if (unit == UNIT::HUM || unit == UNIT::CO2HUM) {
-            humiUnit = unit;
-        } else if (unit == UNIT::PRESS || mainUnit == UNIT::GAS || mainUnit == UNIT::ALT) {
-            otherUnit = unit;
-            if (minorUnit == UNIT::NUNIT && unit == UNIT::ALT) minorUnit = unit;
         }
+        if (unit == UNIT::HUM || unit == UNIT::CO2HUM) {
+            humiUnit = unit;
+        } 
+        if (unit == UNIT::PRESS || mainUnit == UNIT::GAS || mainUnit == UNIT::ALT) {
+            otherUnit = unit;
+        }
+        if (minorUnit == UNIT::NUNIT && unit == UNIT::ALT) minorUnit = unit;
+
         String uName = sensors.getUnitName(unit);
         float uValue = sensors.getUnitValue(unit);
         String uSymb = sensors.getUnitSymbol(unit);
@@ -192,7 +197,7 @@ void sensorsInit() {
     Wire.begin(32, 33);           // I2C external port (bottom connector)
     Wire1.begin(25, 26);          // I2C via Hat (top connector)
     sensors.setSampleTime(1);     // config sensors sample time interval
-    sensors.setDebugMode(true);  // [optional] debug mode
+    sensors.setDebugMode(false);  // [optional] debug mode
     sensors.detectI2COnly(true);  // force to only i2c sensors
     sensors.init();               // Auto detection to UART and i2c sensors
 }
@@ -221,13 +226,15 @@ void setup() {
     M5.begin(false, false, true);
     sensorsInit();
     display.init(115200,false);
-
+    int reset_reason = rtc_get_reset_reason(0);
+    // Serial.println("-->[MAIN] Reset reason  \t: " + String(reset_reason));
     M5.update();
+    // if (M5.BtnMID.isPressed() || reset_reason == 1) {
     if (M5.BtnMID.isPressed()) {
-        // sensorsConfig();
         displayHome();
-        while(!sensorsLoop());
+        sensorsLoop();
         displayCO2ValuesPartialMode();
+        beep();
     }
 
     delay(100);
@@ -246,6 +253,9 @@ void loop() {
             if(BEEP_ENABLE == 1 && mainValue > alarmValue ) beep();
             count = 0;
         }
+    }else{
+        resetVariables();
+        displayCO2ValuesPartialMode();
     }
 
     if (drawReady) {
