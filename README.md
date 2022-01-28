@@ -1,24 +1,38 @@
-# M5CoreInk / M5StickC CO2 Sensirion sensor hat
+# M5CoreInk Multi Sensor
 
-Source code and 3DPrint files for making a CO2 hat for M5CoreInk/M5StickC (or any ESP32 compatible board), this use a Sensirion SCD30 sensor for get CO2 values.
+This a complete project that use the [CanAirIO Sensors Library](https://github.com/kike-canaries/canairio_sensorlib) to have a complete air quality device, with many posibilities and sensors, for example one CO2 sensor or the combination of it with particulate sensors (PM2.5) or environment sensors (T, H, P, Alt etc) with automatic selection of each driver and library for handling these sensors with a few lines of code. Plese see the [demo video](#demo)
+
+Also the installation of this software in your device is possible only with one click via an easy [Web installer](#installation).
+
 
 # Features
 
+- [x] Multi variable multi sensor support with zero config
 - [x] Partial update (fast refresh without blink) in USB mode
 - [x] 5 sec measure rate in USB mode
-- [x] 60 sec measure rate in Battery mode
+- [x] configurable measure rate in Battery mode
 - [x] Low power consumption in Battery mode (Deep sleep via RTC)
-- [x] Able to set beep alarm
-- [x] Redraw complete screen via midle button
+- [x] Able to set beep alarm for PM2.5 or CO2
+- [x] Redraw complete screen and first setup via midle button
 - [ ] NTP sync via WiFi or Bluetooth
-- [ ] Compatibility with [CanAirIO](https://canair.io) firmware
+- [ ] Compatibility with [CanAirIO](https://canair.io) project 
 - [ ] GATT server for notifications
+
+# Installation
+
+## Easy way via CanAirIO Web Installer
+
 
 ---
 
-![M5coreInk CO2 hat](images/collage.jpg)
 
-# Components
+# 3D Printer CO2 Hat alternative
+
+In this repo you able to download the 3DPrint files for making a CO2 hat for M5CoreInk/M5StickC, this use a Sensirion SCD30 sensor for get CO2 values.
+
+<a href="https://youtu.be/im0LNFRrHCg" target="_blank"><img src="images/youtube.jpg"></a>
+
+## Components
 
 | Description  | Store link |
 |----------------------------|-------------------------------|
@@ -30,20 +44,22 @@ Source code and 3DPrint files for making a CO2 hat for M5CoreInk/M5StickC (or an
 | M5StickC Plus (compatible) | [M5Stack](https://m5stack.com/collections/m5-core/products/m5stickc-plus-esp32-pico-mini-iot-development-kit)
 |      |      |
 
-# How to build it
+![M5coreInk CO2 hat](images/collage.jpg)
 
-<a href="https://youtu.be/im0LNFRrHCg" target="_blank"><img src="images/youtube.jpg"></a>
+## 3D print Files
 
+<a href="https://github.com/hpsaturn/co2_m5coreink/tree/master/box" target="_blank"><img src="images/3Dpreview.jpg"></a>
 
-# Firmware upload
+# Build your own firmware 
 
-First of all, install PlatformIO with your favourite IDE (i.e. VSCode). Follow [this](https://platformio.org/platformio-ide) instructions. Also, you may need to install [git](http://git-scm.com/) in your system.
+Alternative to compiling and inatall your own firmware via PlatformIO with your favourite IDE (i.e. VSCode). Follow [this](https://platformio.org/platformio-ide) instructions. Also, you may need to install [git](http://git-scm.com/) in your system.
 
 ## Clone the repo
 
 ```sh
 git clone https://github.com/hpsaturn/co2_m5coreink.git
 ```
+and after that:
 
 ### Via IDE (vscode)
 
@@ -60,8 +76,4 @@ After the clone, enter to directory and you can build and upload the current fir
 ```shell
 pio run --target upload
 ```
-
-# 3D print Files
-
-<a href="https://github.com/hpsaturn/co2_m5coreink/tree/master/box" target="_blank"><img src="images/3Dpreview.jpg"></a>
 

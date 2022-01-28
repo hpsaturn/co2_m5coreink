@@ -24,12 +24,10 @@
 #include <M5CoreInk.h>
 #include <Sensors.hpp>
 #include <StreamString.h>
-#include <rom/rtc.h>
 
 #define DEEP_SLEEP_MODE       1     // eInk and esp32 hibernate
-#define DEEP_SLEEP_TIME     300     // *** !! Please change it !! *** to 600s (10m) or more 
-#define SAMPLES_COUNT         9     // samples before suspend and show (for PM2.5 ~9, 18sec or more)
-#define LOOP_DELAY            2     // seconds
+#define DEEP_SLEEP_TIME      30     // *** !! Please change it !! *** to 600s (10m) or more 
+#define MAX_SAMPLES_COUNT     8     // samples before suspend and show (for PM2.5 ~9, 18sec or more)
 #define BEEP_ENABLE           1     // eneble high level alarm
 #define PM25_ALARM_BEEP      50     // PM2.5 level to trigger alarm
 #define CO2_ALARM_BEEP     2000     // CO2 ppm level to trigger alarm
@@ -55,9 +53,14 @@ UNIT tempUnit = UNIT::NUNIT;
 UNIT humiUnit = UNIT::NUNIT;
 UNIT otherUnit = UNIT::NUNIT; 
 
-uint16_t count;
+uint16_t samples_count = 0;
 bool drawReady;
 bool isCharging;
+bool isCalibrating;
+int calibration_counter = 60;
+/************************************************
+ *           eINK static GUI methods
+ * **********************************************/
 
 void displayHomeCallback(const void*) {
     uint16_t x = 15;
@@ -76,7 +79,11 @@ void displayHome() {
     display.drawPaged(displayHomeCallback, 0);
 }
 
-void displayCO2ValuesCallback(const void*) {
+/************************************************
+ *       eINK sensor values GUI methods
+ * **********************************************/
+
+void displayMainValue(UNIT unit){
     uint16_t x = 15;
     uint16_t y = display.height() / 2 - 30;
     display.fillScreen(GxEPD_WHITE);
@@ -84,21 +91,23 @@ void displayCO2ValuesCallback(const void*) {
     display.setCursor(x, y);
     display.setFont(&FreeMonoBold18pt7b);
     display.printf("%04i", (uint16_t)sensors.getUnitValue(mainUnit));
-
     display.setFont(&FreeMonoBold9pt7b);
-    String mainUnitSymbol = sensors.getUnitName(mainUnit)+" / "+sensors.getUnitSymbol(mainUnit);
+    String mainUnitSymbol = sensors.getUnitName(unit)+" / "+sensors.getUnitSymbol(unit);
     uint16_t lenght = mainUnitSymbol.length();
     x = (display.width() / 2) - ((lenght*11)/2);
     y = display.height() / 2 - 8;
     display.setTextSize(0);
     display.setCursor(x, y);
     display.print(mainUnitSymbol);
+}
 
+void displayValuesCallback(const void*) {
+    displayMainValue(mainUnit);
+    uint16_t x = 15;
+    uint16_t y = display.height() / 2 - 30;
     display.setFont(&FreeMonoBold12pt7b);
     display.setTextSize(1);
-
     x = 11;
-
     y = display.height() / 2 + 25;
     display.setCursor(x, y);
     String minorName = sensors.getUnitName(minorUnit);
@@ -123,24 +132,72 @@ void displayCO2ValuesCallback(const void*) {
     Serial.println("done");
 }
 
-/**
- * Display CO2 values in partialMode update.
- *  
- * it is a partial refresh mode can be used to full screen,
- * effective if display panel hasFastPartialUpdate
- */
-void displayValuesPartialMode() {
-    Serial.println("-->[eINK] displayValuesPartialMode");
-    Serial.print("-->[eINK] drawing..");
-    drawReady = false;
-    display.setPartialWindow(0, 0, display.width(), display.height());
-    display.setRotation(0);
-    display.setFont(&FreeMonoBold24pt7b);
+void calibrationTitleCallback(const void*) {
+    displayMainValue(UNIT::CO2);
+    uint16_t x = 10;
+    uint16_t y = display.height() / 2 + 25;
+    display.setFont(&FreeMonoBold9pt7b);
     display.setTextSize(1);
-    display.setTextColor(GxEPD_BLACK);
-    display.drawPaged(displayCO2ValuesCallback, 0);
+    display.setCursor(x, y);
+    display.print("CO2 CALIBRATION:");
+    
+    display.setTextSize(1);
+    display.setCursor(x, y+30);
+    display.setTextSize(0);
+    display.print("Send command?");
+
+    display.setCursor(x, y + 50);
+    display.setTextSize(0);
+    display.print("CENTER:    YES");
+
+    display.setCursor(x, y + 70);
+    display.setTextSize(0);
+    display.print("DOWN  :    NO");
 }
 
+void calibrationReadyCallBack(const void*) {
+    uint16_t x = 10;
+    uint16_t y = display.height() / 2 - 20;
+    display.fillScreen(GxEPD_WHITE);
+    display.setCursor(x, y);
+    display.print("!!CALIBRATED!!");
+}
+
+void loadingCallBack(const void*) {
+    display.setCursor(10, 190);
+    display.setTextSize(0);
+    display.print("Restarting..");
+}
+
+void displayPartialMode(void (*drawCallback)(const void*)) {
+    static uint32_t timeStamp = 0;      
+    if ((millis() - timeStamp > 1000)) {  // eInk refresh every 2 seconds
+        timeStamp = millis();
+        Serial.println("-->[eINK] displayValuesPartialMode");
+        Serial.print("-->[eINK] drawing..");
+        drawReady = false;
+        display.setPartialWindow(0, 0, display.width(), display.height());
+        display.setRotation(0);
+        // display.setFont(&FreeMonoBold24pt7b);
+        display.setTextSize(1);
+        display.setTextColor(GxEPD_BLACK);
+        display.drawPaged(drawCallback, 0);
+    }
+}
+
+void displayMessageTitle(void (*drawCallback)(const void*)) {
+    display.setRotation(0);
+    display.setFont(&FreeMonoBold9pt7b);
+    display.setTextColor(GxEPD_BLACK);
+    display.setFullWindow();
+    display.drawPaged(drawCallback, 0);
+}
+
+/************************************************
+ *           Sensors methods
+ * **********************************************/
+
+/// for connection and disconnection demo
 void resetVariables() {  
     mainUnit = UNIT::NUNIT;
     minorUnit = UNIT::NUNIT;
@@ -152,6 +209,7 @@ void resetVariables() {
     sensors.resetAllVariables();
 }
 
+/// main method for sensors priority and rules
 void getSensorsUnits() {
     Serial.println("-->[MAIN] Preview sensor values:");
     UNIT unit = sensors.getNextUnit();
@@ -185,22 +243,9 @@ void getSensorsUnits() {
     }
 }
 
-bool sensorsLoop() {
-    if (sensors.readAllSensors()) {
-        getSensorsUnits();
-        return true;
-    }
-    return false;
-}
-
-void sensorsInit() {
-    Serial.println("-->[SETUP] Detecting sensors..");
-    Wire.begin(32, 33);           // I2C external port (bottom connector)
-    Wire1.begin(25, 26);          // I2C via Hat (top connector)
-    sensors.setSampleTime(1);     // config sensors sample time interval
-    sensors.setDebugMode(false);  // [optional] debug mode
-    sensors.detectI2COnly(true);  // force to only i2c sensors
-    sensors.init();               // Auto detection to UART and i2c sensors
+void simulateDeepSleep() {   // it's only used on USB mode
+    Serial.println("-->[MAIN] Simulate deep sleep");
+    sensors.init();
 }
 
 void beep() {
@@ -209,54 +254,21 @@ void beep() {
     M5.Speaker.mute();
 }
 
-void simulateDeepSleep() {
-    Serial.println("-->[MAIN] Simulate deep sleep");
-    sensors.init();
-}
-
-void setup() {
-    Serial.begin(115200);
-    Serial.println();
-    Serial.println("-->[SETUP] setup init");
-
-#ifdef DISABLE_LED    // turnoff it for improve battery life
-    pinMode(LED_EXT_PIN, OUTPUT);
-    digitalWrite(LED_EXT_PIN, HIGH);   
-#endif
-    
-    M5.begin(false, false, true);
-    sensorsInit();
-    display.init(115200,false);
-    int reset_reason = rtc_get_reset_reason(0);
-    // Serial.println("-->[MAIN] Reset reason  \t: " + String(reset_reason));
-    M5.update();
-    // if (M5.BtnMID.isPressed() || reset_reason == 1) {
-    if (M5.BtnMID.isPressed()) {
-        displayHome();
-        sensorsLoop();
-        displayValuesPartialMode();
-        beep();
-    }
-
-    delay(100);
-    Serial.println("-->[SETUP] setup done");
-}
-
-void loop() {
-    if (sensorsLoop()) {
-        count++;
-        if (count >= SAMPLES_COUNT) {
-            displayValuesPartialMode();
-            uint16_t alarmValue = 0;
-            uint16_t mainValue = sensors.getUnitValue(mainUnit);
-            if (mainUnit == UNIT::PM25) alarmValue = PM25_ALARM_BEEP;
-            else alarmValue = CO2_ALARM_BEEP;
-            if(BEEP_ENABLE == 1 && mainValue > alarmValue ) beep();
-            count = 0;
-        }
-    }else{
-        resetVariables();
-        displayValuesPartialMode();
+/// sensors callback, here we can get the values
+void onSensorDataOk() {
+    getSensorsUnits();  // instead of readAllSensors(). See the lib examples
+    if (isCalibrating) return;
+    samples_count++;
+    if (samples_count >= MAX_SAMPLES_COUNT) {
+        displayPartialMode(displayValuesCallback);
+        uint16_t alarmValue = 0;
+        uint16_t mainValue = sensors.getUnitValue(mainUnit);
+        if (mainUnit == UNIT::PM25)
+            alarmValue = PM25_ALARM_BEEP;
+        else
+            alarmValue = CO2_ALARM_BEEP;
+        if (BEEP_ENABLE == 1 && mainValue > alarmValue) beep();
+        samples_count = 0;
     }
 
     if (drawReady) {
@@ -273,6 +285,81 @@ void loop() {
         }
         drawReady = false;
     }
+}
 
-    delay(LOOP_DELAY * 1000);
+void onSensorNoData(const char * msg) {
+    Serial.println("-->[MAIN] No data");
+    resetVariables();
+    displayPartialMode(displayValuesCallback);
+}
+
+void checkButtons() {
+    M5.update();
+    if (M5.BtnMID.isPressed()) {
+        displayHome();
+        sensors.readAllSensors();
+        delay(1000);
+        sensors.readAllSensors();
+        displayPartialMode(displayValuesCallback);
+        beep();
+    }
+    if (M5.BtnUP.isPressed()) {
+        displayHome();
+        calibration_counter = 60;
+        isCalibrating = true;
+        while (!M5.BtnMID.isPressed()){
+            M5.update();
+            sensors.loop();
+            displayPartialMode(calibrationTitleCallback);
+            if (M5.BtnMID.wasPressed()) {
+                beep(); 
+                delay(500);
+                beep();
+                delay(500);
+                displayMessageTitle(calibrationReadyCallBack);
+                break;
+            }
+            if (M5.BtnDOWN.wasPressed()) {
+                displayMessageTitle(loadingCallBack);
+                samples_count = MAX_SAMPLES_COUNT-2;
+                break;
+            }
+        }
+        isCalibrating = false;
+    }
+}
+
+void sensorsInit() {
+    Serial.println("-->[SETUP] Detecting sensors..");
+    Wire.begin(32, 33);                          // I2C external port (bottom connector)
+    Wire1.begin(25, 26);                         // I2C via Hat (top connector)
+    sensors.setSampleTime(2);                    // config sensors sample time interval
+    sensors.setOnDataCallBack(&onSensorDataOk);  // all data read callback
+    sensors.setOnErrorCallBack(&onSensorNoData); // [optional] error callback
+    sensors.setDebugMode(false);                 // [optional] debug mode
+    sensors.detectI2COnly(true);                 // force to only i2c sensors
+    sensors.init();                              // Auto detection to UART and i2c sensors
+}
+
+void setup() {
+    Serial.begin(115200);
+    Serial.println();
+    Serial.println("-->[SETUP] setup init");
+
+#ifdef DISABLE_LED    // turnoff it for improve battery life
+    pinMode(LED_EXT_PIN, OUTPUT);
+    digitalWrite(LED_EXT_PIN, HIGH);   
+#endif
+    
+    M5.begin(false, false, true);
+    sensorsInit();
+    display.init(115200,false);
+    checkButtons();
+
+    delay(100);
+    Serial.println("-->[SETUP] setup done");
+}
+
+void loop() {
+    sensors.loop();
 }
