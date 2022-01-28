@@ -27,8 +27,8 @@
 #include <rom/rtc.h>
 
 #define DEEP_SLEEP_MODE       1     // eInk and esp32 hibernate
-#define DEEP_SLEEP_TIME      20     // Please change it to 600s (10m) or more 
-#define SAMPLES_COUNT         8     // samples before suspend (for PM2.5 ~9, 18sec, or more)
+#define DEEP_SLEEP_TIME     300     // *** !! Please change it !! *** to 600s (10m) or more 
+#define SAMPLES_COUNT         9     // samples before suspend and show (for PM2.5 ~9, 18sec or more)
 #define LOOP_DELAY            2     // seconds
 #define BEEP_ENABLE           1     // eneble high level alarm
 #define PM25_ALARM_BEEP      50     // PM2.5 level to trigger alarm
@@ -129,8 +129,8 @@ void displayCO2ValuesCallback(const void*) {
  * it is a partial refresh mode can be used to full screen,
  * effective if display panel hasFastPartialUpdate
  */
-void displayCO2ValuesPartialMode() {
-    Serial.println("-->[eINK] displayCO2ValuesPartialMode");
+void displayValuesPartialMode() {
+    Serial.println("-->[eINK] displayValuesPartialMode");
     Serial.print("-->[eINK] drawing..");
     drawReady = false;
     display.setPartialWindow(0, 0, display.width(), display.height());
@@ -175,6 +175,7 @@ void getSensorsUnits() {
             otherUnit = unit;
         }
         if (minorUnit == UNIT::NUNIT && unit == UNIT::ALT) minorUnit = unit;
+        if (otherUnit == UNIT::NUNIT && unit == UNIT::CO2TEMP) otherUnit = unit;
 
         String uName = sensors.getUnitName(unit);
         float uValue = sensors.getUnitValue(unit);
@@ -233,7 +234,7 @@ void setup() {
     if (M5.BtnMID.isPressed()) {
         displayHome();
         sensorsLoop();
-        displayCO2ValuesPartialMode();
+        displayValuesPartialMode();
         beep();
     }
 
@@ -245,7 +246,7 @@ void loop() {
     if (sensorsLoop()) {
         count++;
         if (count >= SAMPLES_COUNT) {
-            displayCO2ValuesPartialMode();
+            displayValuesPartialMode();
             uint16_t alarmValue = 0;
             uint16_t mainValue = sensors.getUnitValue(mainUnit);
             if (mainUnit == UNIT::PM25) alarmValue = PM25_ALARM_BEEP;
@@ -255,7 +256,7 @@ void loop() {
         }
     }else{
         resetVariables();
-        displayCO2ValuesPartialMode();
+        displayValuesPartialMode();
     }
 
     if (drawReady) {
