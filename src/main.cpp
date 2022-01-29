@@ -26,12 +26,12 @@
 #include <StreamString.h>
 
 #define DEEP_SLEEP_MODE       1     // eInk and esp32 hibernate
-#define DEEP_SLEEP_TIME     600     // *** !! Please change it !! *** to 600s (10m) or more 
-#define MAX_SAMPLES_COUNT     8     // samples before suspend and show (for PM2.5 ~9, 18sec or more)
+#define DEEP_SLEEP_TIME      20     // *** !! Please change it !! *** to 600s (10m) or more 
+#define MAX_SAMPLES_COUNT     4     // samples before suspend and show (for PM2.5 ~9, 18sec or more)
 #define BEEP_ENABLE           1     // eneble high level alarm
 #define PM25_ALARM_BEEP      50     // PM2.5 level to trigger alarm
 #define CO2_ALARM_BEEP     2000     // CO2 ppm level to trigger alarm
-#define DISABLE_LED                 // improve battery
+#define DISABLE_LED                 // improve battery life
 
 #define ENABLE_GxEPD2_GFX 0
 
@@ -68,15 +68,6 @@ void displayHomeCallback(const void*) {
     display.fillScreen(GxEPD_WHITE);
     display.setCursor(x, y);
     display.print("0000");
-}
-
-void displayHome() {
-    display.setRotation(0);
-    display.setFont(&FreeMonoBold18pt7b);
-    display.setTextSize(2);
-    display.setTextColor(GxEPD_BLACK);
-    display.setFullWindow();
-    display.drawPaged(displayHomeCallback, 0);
 }
 
 /************************************************
@@ -182,6 +173,15 @@ void displayPartialMode(void (*drawCallback)(const void*)) {
     }
 }
 
+void displayFullWindow(void (*drawCallback)(const void*)) {
+    display.setRotation(0);
+    display.setFont(&FreeMonoBold18pt7b);
+    display.setTextSize(2);
+    display.setTextColor(GxEPD_BLACK);
+    display.setFullWindow();
+    display.drawPaged(drawCallback, 0);
+}
+
 void displayMessageTitle(void (*drawCallback)(const void*)) {
     display.setRotation(0);
     display.setFont(&FreeMonoBold9pt7b);
@@ -259,7 +259,7 @@ void shutdown() {
         M5.shutdown(DEEP_SLEEP_TIME);
         Serial.println("-->[LOOP] USB is connected..");
         isCharging = true;  // it only is reached when the USB is connected
-        simulateDeepSleep();
+        // simulateDeepSleep();
         Serial.println("-->[LOOP] Deep sleep done.");
     }
 }
@@ -270,7 +270,6 @@ void onSensorDataOk() {
     if (isCalibrating) return;
     samples_count++;
     if (samples_count >= MAX_SAMPLES_COUNT) {
-        displayPartialMode(displayValuesCallback);
         uint16_t alarmValue = 0;
         uint16_t mainValue = sensors.getUnitValue(mainUnit);
         if (mainUnit == UNIT::PM25)
@@ -279,6 +278,7 @@ void onSensorDataOk() {
             alarmValue = CO2_ALARM_BEEP;
         if (BEEP_ENABLE == 1 && mainValue > alarmValue) beep();
         samples_count = 0;
+        displayPartialMode(displayValuesCallback);
     }
 
     if (drawReady) {
@@ -289,7 +289,7 @@ void onSensorDataOk() {
 }
 
 void onSensorNoData(const char * msg) {
-    Serial.println("-->[MAIN] No data");
+    Serial.println(msg);
     resetVariables();
     if (drawReady) {
         resetVariables(); // only for demostration connection and reconnection sensors
@@ -302,13 +302,13 @@ void onSensorNoData(const char * msg) {
 void checkButtons() {
     M5.update();
     if (M5.BtnMID.isPressed()) {
-        displayHome();
+        displayFullWindow(displayHomeCallback);
         sensors.readAllSensors();
         beep();
         displayPartialMode(displayValuesCallback);
     }
     if (M5.BtnUP.isPressed()) {
-        displayHome();
+        displayFullWindow(displayHomeCallback);
         calibration_counter = 60;
         isCalibrating = true;
         while (!M5.BtnMID.isPressed()){
@@ -337,11 +337,11 @@ void checkButtons() {
 void sensorsInit() {
     Serial.println("-->[SETUP] Detecting sensors..");
     Wire.begin(32, 33);                          // I2C external port (bottom connector)
-    Wire1.begin(25, 26);                         // I2C via Hat (top connector)
+    // Wire1.begin(25, 26);                         // I2C via Hat (top connector)
     sensors.setSampleTime(2);                    // config sensors sample time interval
     sensors.setOnDataCallBack(&onSensorDataOk);  // all data read callback
     sensors.setOnErrorCallBack(&onSensorNoData); // [optional] error callback
-    sensors.setDebugMode(false);                 // [optional] debug mode
+    sensors.setDebugMode(true);                  // [optional] debug mode
     sensors.detectI2COnly(true);                 // force to only i2c sensors
     sensors.init();                              // Auto detection to UART and i2c sensors
 }
@@ -355,10 +355,11 @@ void setup() {
     pinMode(LED_EXT_PIN, OUTPUT);
     digitalWrite(LED_EXT_PIN, HIGH);   
 #endif
-    
-    M5.begin(false, false, true);
     sensorsInit();
+
+    M5.begin(false, false, true);
     display.init(115200,false);
+    delay(2000); // wait for M5 to init (possible issue with some sensors)
     checkButtons();
 
     delay(100);
