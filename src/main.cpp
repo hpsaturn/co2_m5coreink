@@ -24,15 +24,17 @@
 #include <M5CoreInk.h>
 #include <Sensors.hpp>
 #include <StreamString.h>
+#include "logger.h"
 
 #define DEEP_SLEEP_MODE       1     // eInk and esp32 hibernate
 #define DEEP_SLEEP_TIME      20     // *** !! Please change it !! *** to 600s (10m) or more 
-#define MAX_SAMPLES_COUNT     4     // samples before suspend and show (for PM2.5 ~9, 18sec or more)
+#define MAX_SAMPLES_COUNT     6     // samples before suspend and show (for PM2.5 ~9, 18sec or more)
 #define BEEP_ENABLE           1     // eneble high level alarm
 #define PM25_ALARM_BEEP      50     // PM2.5 level to trigger alarm
 #define CO2_ALARM_BEEP     2000     // CO2 ppm level to trigger alarm
 #define DISABLE_LED                 // improve battery life
 
+#define MAX_INIT_RETRY        3     // max retry count for i2c sensors
 #define ENABLE_GxEPD2_GFX 0
 
 #include <GxEPD2_BW.h>
@@ -58,6 +60,7 @@ bool drawReady;
 bool isCharging;
 bool isCalibrating;
 int calibration_counter = 60;
+int initRetry = 0;
 /************************************************
  *           eINK static GUI methods
  * **********************************************/
@@ -141,6 +144,7 @@ void calibrationTitleCallback(const void*) {
     display.setCursor(x, y + 70);
     display.setTextSize(0);
     display.print("DOWN  :    NO");
+    drawReady = true;
 }
 
 void calibrationReadyCallBack(const void*) {
@@ -166,8 +170,6 @@ void displayPartialMode(void (*drawCallback)(const void*)) {
         drawReady = false;
         display.setPartialWindow(0, 0, display.width(), display.height());
         display.setRotation(0);
-        // display.setFont(&FreeMonoBold24pt7b);
-        display.setTextSize(1);
         display.setTextColor(GxEPD_BLACK);
         display.drawPaged(drawCallback, 0);
     }
@@ -206,8 +208,14 @@ void resetVariables() {
     sensors.resetAllVariables();
 }
 
+void beep() {
+    M5.Speaker.tone(2000, 50);
+    delay(30);
+    M5.Speaker.mute();
+}
+
 /// main method for sensors priority and rules
-void getSensorsUnits() {
+void getSensorsUnits() { 
     Serial.println("-->[MAIN] Preview sensor values:");
     UNIT unit = sensors.getNextUnit();
     while(unit != UNIT::NUNIT) {
@@ -221,7 +229,6 @@ void getSensorsUnits() {
         }
         if (unit == UNIT::TEMP || unit == UNIT::CO2TEMP) {
             tempUnit = unit;
-            if (mainUnit == UNIT::NUNIT) mainUnit = unit;
         }
         if (unit == UNIT::HUM || unit == UNIT::CO2HUM) {
             humiUnit = unit;
@@ -235,9 +242,12 @@ void getSensorsUnits() {
         String uName = sensors.getUnitName(unit);
         float uValue = sensors.getUnitValue(unit);
         String uSymb = sensors.getUnitSymbol(unit);
-        Serial.println("-->[MAIN] " + uName + " \t: " + String(uValue) + " " + uSymb);
+        mqttLogger.println("-->[MAIN] " + uName + " \t: " + String(uValue) + " " + uSymb);
         unit = sensors.getNextUnit();
     }
+
+    if (mainUnit == UNIT::NUNIT && tempUnit != UNIT::NUNIT) mainUnit = tempUnit;
+
 }
 
 void simulateDeepSleep() {   // it's only used on USB mode
@@ -245,15 +255,19 @@ void simulateDeepSleep() {   // it's only used on USB mode
     sensors.init();
 }
 
-void beep() {
-    M5.Speaker.tone(2000, 50);
-    delay(30);
-    M5.Speaker.mute();
+void checkAQIAlarm() {
+    uint16_t alarmValue = 0;
+    uint16_t mainValue = sensors.getUnitValue(mainUnit);
+    if (mainUnit == UNIT::PM25)
+        alarmValue = PM25_ALARM_BEEP;
+    else
+        alarmValue = CO2_ALARM_BEEP;
+    if (BEEP_ENABLE == 1 && mainValue > alarmValue) beep();
 }
 
 void shutdown() {
     if (DEEP_SLEEP_MODE == 1) {
-        Serial.println("-->[LOOP] Deep sleep..");
+        mqttLogger.println("-->[LOOP] Deep sleep..");
         display.display(isCharging);
         display.powerOff();
         M5.shutdown(DEEP_SLEEP_TIME);
@@ -265,38 +279,36 @@ void shutdown() {
 }
 
 /// sensors callback, here we can get the values
-void onSensorDataOk() {
-    getSensorsUnits();  // instead of readAllSensors(). See the lib examples
+void onSensorDataOk() { 
+    if (samples_count >= MAX_SAMPLES_COUNT / 2) // we wait for some slow sensors
+        getSensorsUnits();
     if (isCalibrating) return;
     samples_count++;
     if (samples_count >= MAX_SAMPLES_COUNT) {
-        uint16_t alarmValue = 0;
-        uint16_t mainValue = sensors.getUnitValue(mainUnit);
-        if (mainUnit == UNIT::PM25)
-            alarmValue = PM25_ALARM_BEEP;
-        else
-            alarmValue = CO2_ALARM_BEEP;
-        if (BEEP_ENABLE == 1 && mainValue > alarmValue) beep();
+        checkAQIAlarm();
         samples_count = 0;
         displayPartialMode(displayValuesCallback);
     }
-
     if (drawReady) {
-        resetVariables(); // only for demostration connection and reconnection sensors
-        shutdown();        
+        resetVariables();
+        shutdown();
         drawReady = false;
     }
 }
 
 void onSensorNoData(const char * msg) {
-    Serial.println(msg);
-    resetVariables();
-    if (drawReady) {
-        resetVariables(); // only for demostration connection and reconnection sensors
-        shutdown();        
-        drawReady = false;
+    mqttLogger.println(msg); 
+    delay(500);
+    if (!sensors.isDataReady() && initRetry++<=MAX_INIT_RETRY) return;
+    else if( initRetry>=MAX_INIT_RETRY) {
+        resetVariables();
+        displayPartialMode(displayValuesCallback);
+        initRetry = 0;
     }
-    else displayPartialMode(displayValuesCallback);
+    if (drawReady) {
+        shutdown();        
+        drawReady = false; 
+    }
 }
 
 void checkButtons() {
@@ -337,35 +349,38 @@ void checkButtons() {
 void sensorsInit() {
     Serial.println("-->[SETUP] Detecting sensors..");
     Wire.begin(32, 33);                          // I2C external port (bottom connector)
-    // Wire1.begin(25, 26);                         // I2C via Hat (top connector)
+    Wire1.begin(25, 26);                         // I2C via Hat (top connector)
     sensors.setSampleTime(2);                    // config sensors sample time interval
     sensors.setOnDataCallBack(&onSensorDataOk);  // all data read callback
     sensors.setOnErrorCallBack(&onSensorNoData); // [optional] error callback
     sensors.setDebugMode(true);                  // [optional] debug mode
     sensors.detectI2COnly(true);                 // force to only i2c sensors
     sensors.init();                              // Auto detection to UART and i2c sensors
+
+    if (sensors.isSensorRegistered(SENSORS::SSCD30)) {
+        sensors.scd30.setMeasurementInterval(2);
+    }
 }
 
 void setup() {
     Serial.begin(115200);
     Serial.println();
-    Serial.println("-->[SETUP] setup init");
+    mqttLoggerDisable();
+    mqttLoggerInit();
 
 #ifdef DISABLE_LED    // turnoff it for improve battery life
     pinMode(LED_EXT_PIN, OUTPUT);
     digitalWrite(LED_EXT_PIN, HIGH);   
 #endif
     sensorsInit();
-
     M5.begin(false, false, true);
     display.init(115200,false);
-    delay(2000); // wait for M5 to init (possible issue with some sensors)
     checkButtons();
-
-    delay(100);
-    Serial.println("-->[SETUP] setup done");
+    delay(100);  
+    mqttLogger.println("-->[SETUP] setup done");
 }
 
 void loop() {
     sensors.loop();
+    mqttLoggerLoop();
 }
