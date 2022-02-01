@@ -24,13 +24,11 @@
 #include <M5CoreInk.h>
 #include <Sensors.hpp>
 
-#define DEEP_SLEEP_MODE       1     // eInk and esp32 hibernate
+#define DEEP_SLEEP_MODE       1     // eInk and esp32 hibernate support (recommended)
 #define DEEP_SLEEP_TIME     600     // *** !! Please change it !! *** to 600s (10m) or more 
-#define MAX_SAMPLES_COUNT     9     // samples before suspend and show (for PM2.5 ~9, 18sec or more)
-#define BEEP_ENABLE           1     // eneble high level alarm
+#define BEEP_ENABLE           1     // Eneble AQI high level alarm:
 #define PM25_ALARM_BEEP      50     // PM2.5 level to trigger alarm
 #define CO2_ALARM_BEEP     2000     // CO2 ppm level to trigger alarm
-
 
 #define MAX_INIT_RETRY        3     // max retry count for i2c sensors
 #define ENABLE_GxEPD2_GFX     0
@@ -48,18 +46,80 @@ GxEPD2_154_M09 medp = GxEPD2_154_M09(/*CS=D8*/ 9, /*DC=D3*/ 15, /*RST=D4*/ 0, /*
 GxEPD2_BW<GxEPD2_154_M09, GxEPD2_154_M09::HEIGHT> display(medp);  // GDEH0154D67
 
 UNIT mainUnit = UNIT::NUNIT;
-UNIT minorUnit = UNIT::NUNIT;
-UNIT tempUnit = UNIT::NUNIT;
-UNIT humiUnit = UNIT::NUNIT;
-UNIT otherUnit = UNIT::NUNIT; 
 
 uint32_t samples_count = 0;
+
 bool drawReady;
 bool isCharging;
 bool isCalibrating;
 bool onContinuousMode;
-int calibration_counter = 60;
+
 int initRetry = 0;
+
+
+/************************************************
+ *       eINK update methods
+ ************************************************/
+
+void displayMainValue(UNIT unit){
+    uint16_t x = 15;
+    uint16_t y = display.height() / 2 - 50;
+    display.setTextSize(2);
+    display.setCursor(x, y);
+    display.setFont(&FreeMonoBold18pt7b);
+    display.printf("%04i", (uint16_t)sensors.getUnitValue(unit));
+    display.setFont(&FreeMonoBold9pt7b);
+    String mainUnitSymbol = sensors.getUnitName(unit)+" / "+sensors.getUnitSymbol(unit);
+    uint16_t lenght = mainUnitSymbol.length();
+    x = (display.width() / 2) - ((lenght*11)/2);
+    y = display.height() / 2 - 28;
+    display.setTextSize(0);
+    display.setCursor(x, y);
+    display.print(mainUnitSymbol);
+}
+
+void displayValuesCallback(const void*) {
+    display.fillScreen(GxEPD_WHITE);
+    uint16_t x = 3;
+    uint16_t y = display.height() / 2;
+    display.writeLine(0,y-18,display.width(),y-18,GxEPD_BLACK);
+    UNIT unit = sensors.getNextUnit();
+    while (unit != UNIT::NUNIT) {
+        String uName = sensors.getUnitName(unit);
+        float uValue = sensors.getUnitValue(unit);
+        String uSymb = sensors.getUnitSymbol(unit);
+        Serial.println("-->[MAIN] process unit " + uName + " \t: " + String(uValue) + " " + uSymb);
+
+        if ((unit == UNIT::CO2 || unit == UNIT::PM25) && mainUnit == UNIT::NUNIT) {
+            mainUnit = unit;
+        } else if (unit == UNIT::CO2 && mainUnit == UNIT::PM25) {
+            mainUnit = unit;
+        }
+        /// Minor units list
+        if (unit != mainUnit) {
+            display.setFont(&FreeMonoBold9pt7b);
+            display.setCursor(x, y);
+            display.setTextSize(0);
+            String minorName = sensors.getUnitName(unit);
+            minorName.replace(".", "");
+            minorName = minorName.substring(0, 4);
+            String minorSymb = sensors.getUnitSymbol(unit).substring(0, 3);
+            minorSymb.replace("/", "");
+            String minorVal = String(sensors.getUnitValue(unit));
+            display.printf("%4s: %7s %3s", minorName.c_str(), minorVal.c_str(), minorSymb.c_str());
+            y = y + 18;
+        }
+        unit = sensors.getNextUnit();
+    }
+
+    if (mainUnit == UNIT::NUNIT)
+        displayMainValue(UNIT::TEMP);  // if no main unit, display temperature
+    else
+        displayMainValue(mainUnit);
+
+    delay(100);
+    drawReady = true;
+}
 
 /************************************************
  *           eINK static GUI methods
@@ -69,8 +129,21 @@ void displayHomeCallback(const void*) {
     uint16_t x = 15;
     uint16_t y = display.height() / 2 - 30;
     display.fillScreen(GxEPD_WHITE);
+    display.setFont(&FreeMonoBold18pt7b);
+    display.setTextSize(1);
     display.setCursor(x, y);
-    display.print("0000");
+    display.print("CanAirIO");
+    display.setFont(&FreeMonoBold12pt7b);
+    display.setTextSize(1);
+    display.setCursor(x=40, y+30);
+    display.print("M5CoreInk");
+    display.setFont(&FreeMonoBold9pt7b);
+    display.setTextSize(0);
+    String version = String(VERSION) + "." + String(REVISION);
+    uint16_t lenght = version.length();
+    x = (display.width() / 2) - ((lenght*11)/2);
+    display.setCursor(x, y+50);
+    display.print(version);
 }
 
 void calibrationReadyCallBack(const void*) {
@@ -85,56 +158,6 @@ void loadingCallBack(const void*) {
     display.setCursor(10, 190);
     display.setTextSize(0);
     display.print("Restarting..");
-}
-
-/************************************************
- *       eINK update methods
- ************************************************/
-
-void displayMainValue(UNIT unit){
-    uint16_t x = 15;
-    uint16_t y = display.height() / 2 - 30;
-    display.fillScreen(GxEPD_WHITE);
-    display.setTextSize(2);
-    display.setCursor(x, y);
-    display.setFont(&FreeMonoBold18pt7b);
-    display.printf("%04i", (uint16_t)sensors.getUnitValue(mainUnit));
-    display.setFont(&FreeMonoBold9pt7b);
-    String mainUnitSymbol = sensors.getUnitName(unit)+" / "+sensors.getUnitSymbol(unit);
-    uint16_t lenght = mainUnitSymbol.length();
-    x = (display.width() / 2) - ((lenght*11)/2);
-    y = display.height() / 2 - 8;
-    display.setTextSize(0);
-    display.setCursor(x, y);
-    display.print(mainUnitSymbol);
-}
-
-void displayValuesCallback(const void*) {
-    displayMainValue(mainUnit);
-    uint16_t x = 11;
-    uint16_t y = display.height() / 2 + 25;
-    String minorName = sensors.getUnitName(minorUnit);
-    display.setCursor(x, y);
-    display.setFont(&FreeMonoBold12pt7b);
-    display.printf("%5s: %04d", minorName.c_str(), (uint16_t)sensors.getUnitValue(minorUnit));
-
-    y = display.height() / 2 + 45;
-    display.setCursor(x, y);
-    display.printf(" Temp: %0.1fC",sensors.getUnitValue(tempUnit));
-
-    y = display.height() / 2 + 65;
-    display.setCursor(x, y);
-    display.printf(" Humi: %0.1f%%",sensors.getUnitValue(humiUnit));
-
-    y = display.height() / 2 + 85;
-    display.setCursor(x, y);
-    String oUnit = sensors.getUnitName(otherUnit);
-    display.printf("%5s: %04.1f", oUnit.c_str(),sensors.getUnitValue(otherUnit));
-
-    delay(100);
-
-    drawReady = true;
-    Serial.println("done");
 }
 
 void calibrationTitleCallback(const void*) {
@@ -169,8 +192,7 @@ void displayPartialMode(void (*drawCallback)(const void*)) {
     static uint32_t timeStamp = 0;      
     if ((millis() - timeStamp > 1000)) {  // eInk refresh every 2 seconds
         timeStamp = millis();
-        Serial.println("-->[eINK] displayValuesPartialMode");
-        Serial.print("-->[eINK] drawing..");
+        Serial.println("-->[eINK] displayValuesPartialMode..");
         drawReady = false;
         display.setPartialWindow(0, 0, display.width(), display.height());
         display.setRotation(0);
@@ -181,8 +203,6 @@ void displayPartialMode(void (*drawCallback)(const void*)) {
 
 void displayFullWindow(void (*drawCallback)(const void*)) {
     display.setRotation(0);
-    display.setFont(&FreeMonoBold18pt7b);
-    display.setTextSize(2);
     display.setTextColor(GxEPD_BLACK);
     display.setFullWindow();
     display.drawPaged(drawCallback, 0);
@@ -221,49 +241,9 @@ void disableLED() {
 /// for connection and disconnection demo
 void resetVariables() {  
     mainUnit = UNIT::NUNIT;
-    minorUnit = UNIT::NUNIT;
-    tempUnit = UNIT::NUNIT;
-    humiUnit = UNIT::NUNIT;
-    otherUnit = UNIT::NUNIT;
     sensors.resetUnitsRegister();
     sensors.resetSensorsRegister();
     sensors.resetAllVariables();
-}
-
-/// main method for sensors priority and rules
-void getSensorsUnits() { 
-    Serial.println("-->[MAIN] Preview sensor values:");
-    UNIT unit = sensors.getNextUnit();
-    while(unit != UNIT::NUNIT) {
-        if ((unit == UNIT::CO2 || unit == UNIT::PM25) && mainUnit == UNIT::NUNIT) {
-            mainUnit = unit;
-        } else if (unit == UNIT::CO2 && mainUnit == UNIT::PM25) {
-            minorUnit = mainUnit;  // CO2 in indoors has more priority
-            mainUnit = unit;       // and is shown in main unit field
-        } else if (unit == UNIT::PM10 && minorUnit == UNIT::NUNIT) {
-            minorUnit = unit;
-        }
-        if (unit == UNIT::TEMP || unit == UNIT::CO2TEMP) {
-            tempUnit = unit;
-        }
-        if (unit == UNIT::HUM || unit == UNIT::CO2HUM) {
-            humiUnit = unit;
-        } 
-        if (unit == UNIT::PRESS || mainUnit == UNIT::GAS || mainUnit == UNIT::ALT) {
-            otherUnit = unit;
-        }
-        if (minorUnit == UNIT::NUNIT && unit == UNIT::ALT) minorUnit = unit;
-        if (otherUnit == UNIT::NUNIT && unit == UNIT::CO2TEMP) otherUnit = unit;
-
-        String uName = sensors.getUnitName(unit);
-        float uValue = sensors.getUnitValue(unit);
-        String uSymb = sensors.getUnitSymbol(unit);
-        Serial.println("-->[MAIN] " + uName + " \t: " + String(uValue) + " " + uSymb);
-        unit = sensors.getNextUnit();
-    }
-
-    if (mainUnit == UNIT::NUNIT && tempUnit != UNIT::NUNIT) mainUnit = tempUnit;
-
 }
 
 void checkAQIAlarm() {
@@ -290,18 +270,22 @@ void shutdown() {
 
 /// sensors callback, here we can get the values
 void onSensorDataOk() { 
-    if (samples_count++ >= MAX_SAMPLES_COUNT / 2) // we wait for some slow sensors
-        getSensorsUnits();
-    if (isCalibrating) return; 
-    if (samples_count >= MAX_SAMPLES_COUNT) {
+    if (isCalibrating) return;
+    
+    int max_samples_count = 2;                                        // number of samples before showing the values
+    if (sensors.isUnitRegistered(UNIT::PM25)) max_samples_count = 7;  // if PM25 is registered, we need more samples
+    
+    Serial.println("-->[MAIN] read sensor attemp\t: " + String(samples_count) + "/" + String(max_samples_count));
+    if (samples_count++ >= max_samples_count) {
         checkAQIAlarm();
         samples_count = 0;
         displayPartialMode(displayValuesCallback);
     }
-    if (drawReady && !onContinuousMode) {
-        resetVariables();
-        shutdown();
+    if (drawReady) {
         drawReady = false;
+        resetVariables();
+        if(!onContinuousMode) shutdown();
+        else sensors.init();                        // Only for demostration we don't need to init again
     }
 }
 
@@ -324,7 +308,6 @@ void onSensorNoData(const char * msg) {
 void checkCalibrationButton() {
     if (M5.BtnUP.isPressed()) {
         displayFullWindow(displayHomeCallback);
-        calibration_counter = 60;
         isCalibrating = true;
         enableLED();
         while (!M5.BtnMID.isPressed()) {
@@ -339,7 +322,6 @@ void checkCalibrationButton() {
             }
             if (M5.BtnDOWN.wasPressed()) {
                 displayMessageTitle(loadingCallBack);
-                samples_count = MAX_SAMPLES_COUNT - 2;
                 break;
             }
         }
@@ -350,14 +332,12 @@ void checkCalibrationButton() {
 
 void checkContinousModeButton() {
     if (M5.BtnDOWN.isPressed()) {
+        enableLED();
         displayFullWindow(displayHomeCallback);
         onContinuousMode = true;
-        enableLED();
         while (!M5.BtnMID.isPressed()) {
             M5.update();
             sensors.loop();
-            samples_count = MAX_SAMPLES_COUNT / 2;      // force to read all sensors
-            displayPartialMode(displayValuesCallback);  // force to display all sensors
         }
         onContinuousMode = false;
         disableLED();
