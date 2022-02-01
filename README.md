@@ -7,8 +7,7 @@ Also the installation of this firmware in your device is possible only with one 
 
 # Demo
 
-![[CanAirIO Sensors Lib DEMO with M5CoreInk](https://youtu.be/i15iEF47CbY)](images/demo_sensorlib.jpg) 
-
+[![CanAirIO Sensors Lib DEMO with M5CoreInk](images/demo_sensorlib.jpg)](https://youtu.be/i15iEF47CbY))
 
 # Features
 
