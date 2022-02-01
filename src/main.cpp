@@ -25,11 +25,10 @@
 #include <Sensors.hpp>
 
 #define DEEP_SLEEP_MODE       1     // eInk and esp32 hibernate support (recommended)
-#define DEEP_SLEEP_TIME       2     // *** !! Please change it !! *** to 600s (10m) or more 
-#define BEEP_ENABLE           1     // eneble high level alarm
+#define DEEP_SLEEP_TIME     600     // *** !! Please change it !! *** to 600s (10m) or more 
+#define BEEP_ENABLE           1     // Eneble AQI high level alarm:
 #define PM25_ALARM_BEEP      50     // PM2.5 level to trigger alarm
 #define CO2_ALARM_BEEP     2000     // CO2 ppm level to trigger alarm
-
 
 #define MAX_INIT_RETRY        3     // max retry count for i2c sensors
 #define ENABLE_GxEPD2_GFX     0
@@ -57,31 +56,6 @@ bool onContinuousMode;
 
 int initRetry = 0;
 
-/************************************************
- *           eINK static GUI methods
- ************************************************/
-
-void displayHomeCallback(const void*) {
-    uint16_t x = 15;
-    uint16_t y = display.height() / 2 - 30;
-    display.fillScreen(GxEPD_WHITE);
-    display.setCursor(x, y);
-    display.print("0000");
-}
-
-void calibrationReadyCallBack(const void*) {
-    uint16_t x = 10;
-    uint16_t y = display.height() / 2 - 20;
-    display.fillScreen(GxEPD_WHITE);
-    display.setCursor(x, y);
-    display.print("!!CALIBRATED!!");
-}
-
-void loadingCallBack(const void*) {
-    display.setCursor(10, 190);
-    display.setTextSize(0);
-    display.print("Restarting..");
-}
 
 /************************************************
  *       eINK update methods
@@ -147,6 +121,45 @@ void displayValuesCallback(const void*) {
     drawReady = true;
 }
 
+/************************************************
+ *           eINK static GUI methods
+ ************************************************/
+
+void displayHomeCallback(const void*) {
+    uint16_t x = 15;
+    uint16_t y = display.height() / 2 - 30;
+    display.fillScreen(GxEPD_WHITE);
+    display.setFont(&FreeMonoBold18pt7b);
+    display.setTextSize(1);
+    display.setCursor(x, y);
+    display.print("CanAirIO");
+    display.setFont(&FreeMonoBold12pt7b);
+    display.setTextSize(1);
+    display.setCursor(x=40, y+30);
+    display.print("M5CoreInk");
+    display.setFont(&FreeMonoBold9pt7b);
+    display.setTextSize(0);
+    String version = String(VERSION) + "." + String(REVISION);
+    uint16_t lenght = version.length();
+    x = (display.width() / 2) - ((lenght*11)/2);
+    display.setCursor(x, y+50);
+    display.print(version);
+}
+
+void calibrationReadyCallBack(const void*) {
+    uint16_t x = 10;
+    uint16_t y = display.height() / 2 - 20;
+    display.fillScreen(GxEPD_WHITE);
+    display.setCursor(x, y);
+    display.print("!!CALIBRATED!!");
+}
+
+void loadingCallBack(const void*) {
+    display.setCursor(10, 190);
+    display.setTextSize(0);
+    display.print("Restarting..");
+}
+
 void calibrationTitleCallback(const void*) {
     displayMainValue(UNIT::CO2);
     uint16_t x = 10;
@@ -190,8 +203,6 @@ void displayPartialMode(void (*drawCallback)(const void*)) {
 
 void displayFullWindow(void (*drawCallback)(const void*)) {
     display.setRotation(0);
-    display.setFont(&FreeMonoBold18pt7b);
-    display.setTextSize(2);
     display.setTextColor(GxEPD_BLACK);
     display.setFullWindow();
     display.drawPaged(drawCallback, 0);
