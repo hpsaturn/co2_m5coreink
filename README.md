@@ -7,7 +7,7 @@ Also the installation of this firmware in your device is possible only with one 
 
 # Demo
 
-Coming soon
+![[CanAirIO Sensors Lib DEMO with M5CoreInk](https://youtu.be/i15iEF47CbY)](images/demo_sensorlib.jpg) 
 
 
 # Features
@@ -65,6 +65,26 @@ pio run --target upload
 ```
 
 and that it is! :D
+
+
+# Usage
+
+This firmware works out of box without any configuration, but it has 3 modes:
+
+### Button Middle
+
+For full refresh of the screen, only use that for example the screen is corrupted when the battery over.
+
+### Button Up
+
+For enter to CO2 calibration mode. Only send the command when you are with the sensor on outdoors for more than 10 minutes. Please read the documentation.
+
+### Button Down
+
+In this mode the green LED turn on and the device try to detect in execution any sensor, also it show the variables continously. For exit, only press the middle button. This mode consume the battery.
+
+![M5CoreInk Air statation Calibration mode](images/calibration.jpg)
+
 
 ---
 
