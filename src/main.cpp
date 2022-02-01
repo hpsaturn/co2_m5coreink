@@ -24,9 +24,8 @@
 #include <M5CoreInk.h>
 #include <Sensors.hpp>
 
-#define DEEP_SLEEP_MODE       1     // eInk and esp32 hibernate
-#define DEEP_SLEEP_TIME       5     // *** !! Please change it !! *** to 600s (10m) or more 
-#define MAX_SAMPLES_COUNT     3     // samples before suspend and show (for PM2.5 ~9, 18sec or more)
+#define DEEP_SLEEP_MODE       1     // eInk and esp32 hibernate support (recommended)
+#define DEEP_SLEEP_TIME       2     // *** !! Please change it !! *** to 600s (10m) or more 
 #define BEEP_ENABLE           1     // eneble high level alarm
 #define PM25_ALARM_BEEP      50     // PM2.5 level to trigger alarm
 #define CO2_ALARM_BEEP     2000     // CO2 ppm level to trigger alarm
@@ -48,17 +47,14 @@ GxEPD2_154_M09 medp = GxEPD2_154_M09(/*CS=D8*/ 9, /*DC=D3*/ 15, /*RST=D4*/ 0, /*
 GxEPD2_BW<GxEPD2_154_M09, GxEPD2_154_M09::HEIGHT> display(medp);  // GDEH0154D67
 
 UNIT mainUnit = UNIT::NUNIT;
-UNIT minorUnit = UNIT::NUNIT;
-UNIT tempUnit = UNIT::NUNIT;
-UNIT humiUnit = UNIT::NUNIT;
-UNIT otherUnit = UNIT::NUNIT; 
 
 uint32_t samples_count = 0;
+
 bool drawReady;
 bool isCharging;
 bool isCalibrating;
 bool onContinuousMode;
-int calibration_counter = 60;
+
 int initRetry = 0;
 
 /************************************************
@@ -234,10 +230,6 @@ void disableLED() {
 /// for connection and disconnection demo
 void resetVariables() {  
     mainUnit = UNIT::NUNIT;
-    minorUnit = UNIT::NUNIT;
-    tempUnit = UNIT::NUNIT;
-    humiUnit = UNIT::NUNIT;
-    otherUnit = UNIT::NUNIT;
     sensors.resetUnitsRegister();
     sensors.resetSensorsRegister();
     sensors.resetAllVariables();
@@ -267,16 +259,22 @@ void shutdown() {
 
 /// sensors callback, here we can get the values
 void onSensorDataOk() { 
-    if (isCalibrating) return; 
-    if (samples_count++ >= MAX_SAMPLES_COUNT) {
+    if (isCalibrating) return;
+    
+    int max_samples_count = 2;                                        // number of samples before showing the values
+    if (sensors.isUnitRegistered(UNIT::PM25)) max_samples_count = 7;  // if PM25 is registered, we need more samples
+    
+    Serial.println("-->[MAIN] read sensor attemp\t: " + String(samples_count) + "/" + String(max_samples_count));
+    if (samples_count++ >= max_samples_count) {
         checkAQIAlarm();
         samples_count = 0;
         displayPartialMode(displayValuesCallback);
     }
-    if (drawReady && !onContinuousMode) {
-        resetVariables();
-        shutdown();
+    if (drawReady) {
         drawReady = false;
+        resetVariables();
+        if(!onContinuousMode) shutdown();
+        else sensors.init();                        // Only for demostration we don't need to init again
     }
 }
 
@@ -299,7 +297,6 @@ void onSensorNoData(const char * msg) {
 void checkCalibrationButton() {
     if (M5.BtnUP.isPressed()) {
         displayFullWindow(displayHomeCallback);
-        calibration_counter = 60;
         isCalibrating = true;
         enableLED();
         while (!M5.BtnMID.isPressed()) {
@@ -314,7 +311,6 @@ void checkCalibrationButton() {
             }
             if (M5.BtnDOWN.wasPressed()) {
                 displayMessageTitle(loadingCallBack);
-                samples_count = MAX_SAMPLES_COUNT - 2;
                 break;
             }
         }
@@ -325,14 +321,12 @@ void checkCalibrationButton() {
 
 void checkContinousModeButton() {
     if (M5.BtnDOWN.isPressed()) {
+        enableLED();
         displayFullWindow(displayHomeCallback);
         onContinuousMode = true;
-        enableLED();
         while (!M5.BtnMID.isPressed()) {
             M5.update();
             sensors.loop();
-            samples_count = MAX_SAMPLES_COUNT / 2;      // force to read all sensors
-            displayPartialMode(displayValuesCallback);  // force to display all sensors
         }
         onContinuousMode = false;
         disableLED();
