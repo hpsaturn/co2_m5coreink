@@ -7,7 +7,7 @@ Also the installation of this firmware in your device is possible only with one 
 
 # Demo
 
-[![CanAirIO Sensors Lib DEMO with M5CoreInk](images/demo_sensorlib.jpg)](https://youtu.be/i15iEF47CbY))
+[![CanAirIO Sensors Lib DEMO with M5CoreInk](images/demo_sensorlib.jpg)](https://youtu.be/i15iEF47CbY)
 
 # Features
 
@@ -17,10 +17,11 @@ Also the installation of this firmware in your device is possible only with one 
 - [x] Automatic sensor refresh interval on USB connection 
 - [x] Partial update (fast refresh without blink) in USB mode
 - [x] Support two I2C channel (Hat or external port).
-- [x] configurable measure rate in Battery mode
+- [x] Auto selection of sample time by sensor type
 - [x] Low power consumption in Battery mode (Deep sleep via RTC)
 - [x] Able to set beep alarm for PM2.5 or CO2
 - [x] Redraw complete screen and first setup via midle button
+- [x] Demo mode with button down
 - [ ] UART implementation for ext port via menu
 - [ ] Auto selection of sample time in order of sensor type
 - [ ] NTP sync via WiFi or Bluetooth
@@ -119,4 +120,8 @@ In this repo you able to download the 3DPrint files for making a CO2 hat for M5C
 ## 3D print Files
 
 <a href="https://github.com/hpsaturn/co2_m5coreink/tree/master/box" target="_blank"><img src="images/3Dpreview.jpg"></a>
+
+# Credits
+
+Thanks to [CanAirIO communitie](https://canair.io/) for the feedback and tests.
 
