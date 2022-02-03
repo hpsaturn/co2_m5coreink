@@ -326,6 +326,7 @@ void checkCalibrationButton() {
             }
         }
         isCalibrating = false;
+        samples_count = 6; // force refresh
         disableLED();
     }
 }
