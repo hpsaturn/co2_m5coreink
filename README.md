@@ -1,3 +1,7 @@
+
+[![PlatformIO](https://github.com/hpsaturn/co2_m5coreink/workflows/PlatformIO/badge.svg)](https://github.com/hpsaturn/co2_m5coreink/actions/) ![ViewCount](https://views.whatilearened.today/views/github/hpsaturn/co2_m5coreink.svg) 
+
+
 # M5CoreInk Multi Sensor
 
 This project use the [CanAirIO Sensors Library](https://github.com/kike-canaries/canairio_sensorlib) to have a complete air quality device. Thanks to this library you able to have many posibilities of sensors and variables automatically, for example you can connect one CO2 sensor or the combination of it with particulate meter sensors (PM2.5) or environment sensors (T, H, P, Alt, etc). The library able to detect and select each driver and thrid party library for handling these sensors and give you the complete list of variables with a few lines of code. Plese see the [demo video](#demo)
