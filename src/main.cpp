@@ -366,6 +366,7 @@ void sensorsInit() {
     Wire.begin(32, 33);                          // I2C external port (bottom connector)
     Wire1.begin(25, 26);                         // I2C via Hat (top connector)
     sensors.setSampleTime(2);                    // config sensors sample time interval
+    sensors.setSeaLevelPressure(1019.0);         // config sea level pressure (default: 1013.25)
     sensors.setOnDataCallBack(&onSensorDataOk);  // all data read callback
     sensors.setOnErrorCallBack(&onSensorNoData); // [optional] error callback
     sensors.setDebugMode(false);                 // [optional] debug mode
@@ -385,7 +386,6 @@ void setup() {
     M5.begin(false, false, true);
     display.init(115200,false);
     checkButtons();
-    delay(100);  
     Serial.println("-->[SETUP] setup done");
 }
 
