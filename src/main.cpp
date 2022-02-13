@@ -247,8 +247,8 @@ void resetVariables() {
 }
 
 void checkAQIAlarm() {
-    uint16_t alarmValue = 0;
-    uint16_t mainValue = sensors.getUnitValue(mainUnit);
+    float alarmValue = 0.0;
+    float mainValue = sensors.getUnitValue(mainUnit);
     if (mainUnit == UNIT::PM25)
         alarmValue = PM25_ALARM_BEEP;
     else
@@ -277,9 +277,9 @@ void onSensorDataOk() {
     
     Serial.println("-->[MAIN] read sensor attemp\t: " + String(samples_count) + "/" + String(max_samples_count));
     if (samples_count++ >= max_samples_count) {
-        checkAQIAlarm();
         samples_count = 0;
         displayPartialMode(displayValuesCallback);
+        checkAQIAlarm();
     }
     if (drawReady) {
         drawReady = false;
