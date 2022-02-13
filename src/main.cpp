@@ -27,8 +27,8 @@
 #define DEEP_SLEEP_MODE       1     // eInk and esp32 hibernate support (recommended)
 #define DEEP_SLEEP_TIME     600     // *** !! Please change it !! *** to 600s (10m) or more 
 #define BEEP_ENABLE           1     // Eneble AQI high level alarm:
-#define PM25_ALARM_BEEP      50     // PM2.5 level to trigger alarm
-#define CO2_ALARM_BEEP     2000     // CO2 ppm level to trigger alarm
+#define PM25_ALARM_BEEP     150     // PM2.5 level to trigger alarm
+#define CO2_ALARM_BEEP     2500     // CO2 ppm level to trigger alarm
 
 #define MAX_INIT_RETRY        3     // max retry count for i2c sensors
 #define ENABLE_GxEPD2_GFX     0
