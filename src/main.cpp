@@ -26,7 +26,7 @@
 
 #define DEEP_SLEEP_MODE       1     // eInk and esp32 hibernate support (recommended)
 #define DEEP_SLEEP_TIME     600     // 600s (10m) or more (battery saving)
-#define SLEEP_USB_TIME        5     // 5s when the USB is connected
+#define SLEEP_USB_TIME       15     // 15s when the USB is connected or DEEP_SLEEP_MODE is 0
 #define BEEP_ENABLE           1     // Eneble AQI high level alarm:
 #define PM25_ALARM_BEEP     150     // PM2.5 level to trigger alarm
 #define CO2_ALARM_BEEP     2500     // CO2 ppm level to trigger alarm
@@ -264,10 +264,11 @@ void shutdown() {
         display.powerOff();
         M5.shutdown(DEEP_SLEEP_TIME);
         Serial.println("-->[LOOP] USB is connected..");
-        isCharging = true;  // it only is reached when the USB is connected
-        Serial.println("-->[LOOP] Simulate sleep");
-        delay(SLEEP_USB_TIME*1000);
+        isCharging = true;  
     }
+    // this only is reached when the USB is connected
+    Serial.println("-->[LOOP] Simulate sleep");
+    delay(SLEEP_USB_TIME*1000);
 }
 
 /// sensors callback, here we can get the values
