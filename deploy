@@ -119,7 +119,7 @@ publish_release () {
   echo "***********************************************"
   echo ""
   COMMIT_LOG=`git log -1 --format='%ci %H %s'`
-  github-release upload --owner $GITHUB_OWNER --repo $GITHUB_REPO --tag "v${SRC_VER}" --release-name "v${SRC_VER} rev${SRC_REV}" --body "${COMMIT_LOG}" $RELDIR/$RELNAME.tar.gz
+  github-release upload --owner ${GITHUB_OWNER} --repo ${GITHUB_REPO} --tag "${SRC_VER}.${SRC_REV}" --release-name "${SRC_VER}.${SRC_REV}" --body "${COMMIT_LOG}" $RELDIR/$RELNAME.tar.gz
   echo ""
   echo "***********************************************"
   echo "*************     done    *********************" 
