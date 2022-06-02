@@ -8,13 +8,16 @@
 ######################################################
 
 SRC_REV=`cat platformio.ini | grep 'revision =' | awk '{print $3}'`
-SRC_VER=`cat platformio.ini | grep 'version =' | awk '{print $3}'`
+SRC_VER=`cat platformio.ini | grep 'version =' | awk '{print $3}' | sed 's/"//g'`
 
 RELDIR="releases"
 GITHUB_OWNER=hpsaturn
 GITHUB_REPO=${PWD##*/}
-RELNAME="$GITHUB_REPO-${SRC_VER}.tar.gz"
-OUTPUT="${RELDIR}/${RELNAME}" 
+TARGET=M5COREINK
+RELNAME="${TARGET}_air_station_${SRC_VER}.${SRC_REV}"
+INSDIR=$RELDIR/installer
+BINDIR="binaries"
+OUTDIR=".pio/build"
 DATE=`date +%Y%m%d`
 
 showHelp () {
@@ -45,29 +48,67 @@ validate_branch () {
 }
 
 clean () {
-  rm -f $OUTPUT
+  rm -rf $INSDIR
+  rm -f $INSDIR/$RELNAME.tar.gz
+  rm -f $INSDIR/*.bin
 }
 
 runtest () {
   pio run --target clean && pio run 
 }
 
+updateInstallerBinaries () {
+  echo ""
+  echo "***********************************************"
+  echo "** Update installer binaries.."
+  echo "***********************************************"
+  echo ""
+  mkdir -p $INSDIR/system
+  cp $OUTDIR/$TARGET/partitions.bin $INSDIR/system/
+  cp ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin $INSDIR/system/
+  cp ~/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/bin/bootloader_dio_40m.bin $INSDIR/system/
+  cp ~/.platformio/packages/tool-esptoolpy/esptool.py $INSDIR/system/
+  cp ~/.platformio/packages/framework-arduinoespressif32/tools/espota.py $INSDIR/system/
+  curl https://raw.githubusercontent.com/kike-canaries/canairio_firmware/master/releases/installer/canairio_installer/install.sh -o $INSDIR/install.sh
+  chmod 755 $INSDIR/install.sh
+}
+
+
 build () {
+  echo ""
+  echo "***********************************************"
+  echo "** Building $1"
+  echo "***********************************************"
+  echo ""
+
+  pio run -s -e $1
 
   echo ""
   echo "***********************************************"
-  echo "** Building rev$SRC_REV ($SRC_VER)"
+  echo "** Firmware $1 output:"
+  mkdir -p $INSDIR/system
+  firmware_in=$OUTDIR/$1/firmware.bin
+  firmware_out=$INSDIR/${RELNAME}.bin
+  cp  $firmware_in $firmware_out
+  echo -n "** MD5:"
+  md5sum $firmware_out
   echo "***********************************************"
   echo ""
-  pio package pack -o $RELDIR/
+}
+
+
+buildInstaller () {
   echo ""
-  tar ztf $OUTPUT
-  echo ""
+  build $1
+  updateInstallerBinaries
+  cd $INSDIR
+  tar zcf ../${RELNAME}.tar.gz .
+  cd ../..
+  rm -rf $INSDIR
   echo "***********************************************"
-  echo "************** Build done *********************" 
+  echo -n "** MD5:"
+  md5sum $RELDIR/${RELNAME}.tar.gz
   echo "***********************************************"
-  echo ""
-  md5sum $OUTPUT
   echo ""
 }
 
@@ -78,7 +119,7 @@ publish_release () {
   echo "***********************************************"
   echo ""
   COMMIT_LOG=`git log -1 --format='%ci %H %s'`
-  github-release upload --owner $GITHUB_OWNER --repo $GITHUB_REPO --tag "v${SRC_VER}" --release-name "v${SRC_VER} rev${SRC_REV}" --body "${COMMIT_LOG}" $OUTPUT
+  github-release upload --owner $GITHUB_OWNER --repo $GITHUB_REPO --tag "v${SRC_VER}" --release-name "v${SRC_VER} rev${SRC_REV}" --body "${COMMIT_LOG}" $RELDIR/$RELNAME.tar.gz
   echo ""
   echo "***********************************************"
   echo "*************     done    *********************" 
@@ -93,7 +134,6 @@ publish_pio () {
 if [ "$1" = "" ]; then
   showHelp
 else
-  validate_version
   validate_branch
   case "$1" in
     clean)
@@ -124,10 +164,6 @@ else
       printOutput
       ;;
 
-    pio)
-      publish_pio
-      ;;
-
     publish)
       publish_release
       ;;
@@ -136,8 +172,12 @@ else
       publish_release
       ;;
 
+    build)
+      buildInstaller $TARGET
+      ;;
+
     *)
-      build $1
+      showHelp
       ;;
   esac
 fi
