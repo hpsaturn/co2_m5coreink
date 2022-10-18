@@ -31,8 +31,8 @@ showHelp () {
   echo "./deploy_release test"
   echo "./deploy_release clean"
   echo "./deploy_release build"
+  echo "./deploy_release publish"
   echo "./deploy_release github"
-  echo "./deploy_release pio"
   echo ""
 }
 
@@ -49,12 +49,12 @@ validate_branch () {
 
 clean () {
   rm -rf $INSDIR
-  rm -f $INSDIR/$RELNAME.tar.gz
-  rm -f $INSDIR/*.bin
+  rm -f $RELDIR/$RELNAME.tar.gz
+  pio run --target clean
 }
 
 runtest () {
-  pio run --target clean && pio run 
+   pio run 
 }
 
 updateInstallerBinaries () {
@@ -104,7 +104,6 @@ buildInstaller () {
   cd $INSDIR
   tar zcf ../${RELNAME}.tar.gz .
   cd ../..
-  rm -rf $INSDIR
   echo "***********************************************"
   echo -n "** MD5:"
   md5sum $RELDIR/${RELNAME}.tar.gz
