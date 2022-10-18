@@ -25,7 +25,7 @@
 #include <Sensors.hpp>
 
 #define DEEP_SLEEP_MODE       1     // eInk and esp32 hibernate support (recommended)
-#define DEEP_SLEEP_TIME     600     // 600s (10m) or more (battery saving)
+#define DEEP_SLEEP_TIME      60     // 600s (10m) or more (battery saving)
 #define SLEEP_USB_TIME       15     // 15s when the USB is connected or DEEP_SLEEP_MODE is 0
 #define BEEP_ENABLE           1     // Eneble AQI high level alarm:
 #define PM25_ALARM_BEEP     150     // PM2.5 level to trigger alarm
@@ -87,9 +87,9 @@ void displayValuesCallback(const void*) {
     UNIT unit = sensors.getNextUnit();
     while (unit != UNIT::NUNIT) {
         String uName = sensors.getUnitName(unit);
-        float uValue = sensors.getUnitValue(unit);
+        // float uValue = sensors.getUnitValue(unit);
         String uSymb = sensors.getUnitSymbol(unit);
-        Serial.println("-->[MAIN] process unit " + uName + " \t: " + String(uValue) + " " + uSymb);
+        // Serial.println("-->[MAIN] process unit " + uName + " \t: " + String(uValue) + " " + uSymb);
 
         if ((unit == UNIT::CO2 || unit == UNIT::PM25) && mainUnit == UNIT::NUNIT) {
             mainUnit = unit;
@@ -193,7 +193,7 @@ void displayPartialMode(void (*drawCallback)(const void*)) {
     static uint32_t timeStamp = 0;      
     if ((millis() - timeStamp > 1000)) {  // eInk refresh every 2 seconds
         timeStamp = millis();
-        Serial.println("-->[eINK] displayValuesPartialMode..");
+        // Serial.println("-->[eINK] displayValuesPartialMode..");
         drawReady = false;
         display.setPartialWindow(0, 0, display.width(), display.height());
         display.setRotation(0);
@@ -259,15 +259,15 @@ void checkAQIAlarm() {
 
 void shutdown() {
     if (DEEP_SLEEP_MODE == 1) {
-        Serial.println("-->[LOOP] Deep sleep..");
+        // Serial.println("-->[LOOP] Deep sleep..");
         display.display(isCharging);
         display.powerOff();
         M5.shutdown(DEEP_SLEEP_TIME);
-        Serial.println("-->[LOOP] USB is connected..");
+        // Serial.println("-->[LOOP] USB is connected..");
         isCharging = true;  
     }
     // this only is reached when the USB is connected
-    Serial.println("-->[LOOP] Simulate sleep");
+    // Serial.println("-->[LOOP] Simulate sleep");
     delay(SLEEP_USB_TIME*1000);
 }
 
@@ -278,7 +278,7 @@ void onSensorDataOk() {
     int max_samples_count = 2;                                        // number of samples before showing the values
     if (sensors.isUnitRegistered(UNIT::PM25)) max_samples_count = 7;  // if PM25 is registered, we need more samples
     
-    Serial.println("-->[MAIN] read sensor attemp\t: " + String(samples_count) + "/" + String(max_samples_count));
+    // Serial.printf("-->[MAIN] read sensor attemp\t: %i/%i\r\n", samples_count, max_samples_count);
     if (samples_count++ >= max_samples_count) {
         samples_count = 0;
         displayPartialMode(displayValuesCallback);
@@ -382,14 +382,14 @@ void sensorsInit() {
 }
 
 void setup() {
-    Serial.begin(115200);
-    Serial.println();
+    // Serial.begin(115200);
+    // Serial.println();
     disableLED();
     sensorsInit();
     M5.begin(false, false, true);
     display.init(115200,false);
     checkButtons();
-    Serial.println("-->[SETUP] setup done");
+    // Serial.println("-->[SETUP] setup done");
 }
 
 void loop() {
