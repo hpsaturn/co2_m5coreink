@@ -66,11 +66,8 @@ updateInstallerBinaries () {
   mkdir -p $INSDIR/system
   cp $OUTDIR/$TARGET/partitions.bin $INSDIR/system/
   cp ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin $INSDIR/system/
-  cp ~/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/bin/bootloader_dio_40m.bin $INSDIR/system/
   cp ~/.platformio/packages/tool-esptoolpy/esptool.py $INSDIR/system/
   cp ~/.platformio/packages/framework-arduinoespressif32/tools/espota.py $INSDIR/system/
-  curl https://raw.githubusercontent.com/kike-canaries/canairio_firmware/master/releases/installer/canairio_installer/install.sh -o $INSDIR/install.sh
-  chmod 755 $INSDIR/install.sh
 }
 
 
@@ -117,8 +114,13 @@ publish_release () {
   echo "********** Publishing release *****************" 
   echo "***********************************************"
   echo ""
-  COMMIT_LOG=`git log -1 --format='%ci %H %s'`
-  github-release upload --owner ${GITHUB_OWNER} --repo ${GITHUB_REPO} --tag "${SRC_VER}.${SRC_REV}" --release-name "${SRC_VER}.${SRC_REV}" --body "${COMMIT_LOG}" $RELDIR/$RELNAME.tar.gz
+  echo "Publishing release: ${SRC_VER}.${SRC_REV}" 
+  echo "uploading: $RELDIR/$RELNAME.tar.gz"
+
+  git tag -a "${SRC_VER}.${SRC_REV}" -m "release ${SRC_VER}.${SRC_REV}"
+  git push origin "${SRC_VER}.${SRC_REV}"
+  git log -n 10 --pretty=format:"%h %s" | gh release create "${SRC_VER}.${SRC_REV}" -F - -t "${SRC_VER}.${SRC_REV}" -p $RELDIR/$RELNAME.tar.gz
+
   echo ""
   echo "***********************************************"
   echo "*************     done    *********************" 
